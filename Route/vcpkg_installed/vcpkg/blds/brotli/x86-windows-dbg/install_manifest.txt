@@ -1,0 +1,12 @@
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/tools/brotli/brotli.exe
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/lib/brotlienc.lib
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/bin/brotlienc.dll
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/lib/brotlidec.lib
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/bin/brotlidec.dll
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/lib/brotlicommon.lib
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/bin/brotlicommon.dll
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/share/unofficial-brotli/unofficial-brotli-targets.cmake
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/share/unofficial-brotli/unofficial-brotli-targets-debug.cmake
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/lib/pkgconfig/libbrotlicommon.pc
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/lib/pkgconfig/libbrotlidec.pc
+E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug/lib/pkgconfig/libbrotlienc.pc

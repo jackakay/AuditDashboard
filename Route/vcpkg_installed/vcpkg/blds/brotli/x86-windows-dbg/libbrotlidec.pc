@@ -1,0 +1,12 @@
+prefix=E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug
+exec_prefix=E:/______audits/Route/Route/Route/vcpkg_installed/vcpkg/pkgs/brotli_x86-windows/debug
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: libbrotlidec
+URL: https://github.com/google/brotli
+Description: Brotli decoder library
+Version: 1.0.9
+Libs: -L${libdir} -lbrotlidec
+Requires.private: libbrotlicommon >= 1.0.2
+Cflags: -I${includedir}

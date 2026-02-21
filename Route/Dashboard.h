@@ -10,6 +10,6 @@ public:
 private:
     ApiClient& apiClient;
     void displayMenu() const;
-    void handleViewTotalMoney(const std::string& bearer);
+    void handleViewTotalMoney(bool isPending);
     void handleGetRoute() const;
 };

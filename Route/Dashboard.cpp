@@ -8,9 +8,7 @@ using namespace std;
 Dashboard::Dashboard(ApiClient& apiClient) : apiClient(apiClient) {}
 
 void Dashboard::start() {
-    string bearer;
-    cout << "Enter your bearer token: ";
-    cin >> bearer;
+    
 
     int choice;
     while (true) {
@@ -18,10 +16,10 @@ void Dashboard::start() {
         cin >> choice;
 
         if (choice == 1) {
-            handleViewTotalMoney(bearer);
+            handleViewTotalMoney(false);
         }
         else if (choice == 2) {
-            handleGetRoute();
+            handleViewTotalMoney(true);
         }
         else {
             exit(0);
@@ -35,11 +33,12 @@ void Dashboard::start() {
 void Dashboard::displayMenu() const {
     cout << "\nWelcome to the dashboard!\n"
         << "1. View total money earnt\n"
-        << "2. Get optimal route\n";
+        << "2. View total money pending\n"
+        << "3. Get optimal route\n";
 }
 
-void Dashboard::handleViewTotalMoney(const std::string& bearer) {
-    float totalMoney = apiClient.getTotalMoneyEarnt(bearer);
+void Dashboard::handleViewTotalMoney(bool isPending) {
+    float totalMoney = apiClient.getTotalMoneyEarnt(isPending);
     cout << "Total money earnt: " << totalMoney << "\n";
 }
 

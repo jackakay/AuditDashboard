@@ -13,11 +13,14 @@ enum RouteType {
 
 class ApiClient {
 public:
-    explicit ApiClient(const std::string& host);
-    float getTotalMoneyEarnt(const std::string& bearer);
+    explicit ApiClient(const std::string& host, const std::string& bearer);
+    float getTotalMoneyEarnt(bool pending);
+   
     std::vector<std::string> getGoogleMapLinks(const std::string& bearer, RouteType route);
+    httplib::Headers headers;
 
 private:
     httplib::Client cli;
     httplib::Headers buildHeaders(const std::string& bearer) const;
+    
 };

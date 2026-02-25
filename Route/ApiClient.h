@@ -15,7 +15,7 @@ class ApiClient {
 public:
     explicit ApiClient(const std::string& host, const std::string& bearer);
     float getTotalMoneyEarnt(bool pending);
-   
+    std::string getName();
     std::vector<std::string> getGoogleMapLinks(const std::string& bearer, RouteType route);
     httplib::Headers headers;
 

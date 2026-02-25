@@ -31,7 +31,7 @@ void Dashboard::start() {
 }
 
 void Dashboard::displayMenu() const {
-    cout << "\nWelcome to the dashboard!\n"
+    cout << "\nWelcome to the dashboard " << apiClient.getName() << "!\n"
         << "1. View total money earnt\n"
         << "2. View total money pending\n"
         << "3. Get optimal route\n";

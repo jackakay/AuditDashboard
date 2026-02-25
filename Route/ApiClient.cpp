@@ -62,6 +62,17 @@ float ApiClient::getTotalMoneyEarnt(bool pendingMoney = false) {
     return totalPay;
 }
 
+std::string ApiClient::getName() {
+    auto res = cli.Get("/api/v1/auditors/me", headers);
+    if (!res || res->status != 200) {
+        std::cerr << "Failed to get auditor info\n";
+        return "";
+    }
+    
+    json j = json::parse(res->body);
+    return j["preferred_name"].get<std::string>();
+}
+
 
 std::vector<std::string> ApiClient::getGoogleMapLinks(const std::string& bearer, RouteType route = RouteType::NEAREST_NEIGHBOUR) {
     std::vector<std::string> links = { };

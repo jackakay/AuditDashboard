@@ -46,7 +46,7 @@ void Dashboard::handleViewTotalMoney(bool isPending) {
 
 void Dashboard::handleGetRoute() const {
     
-    auto links = apiClient.getGoogleMapLinks("", RouteType::NEAREST_NEIGHBOUR);
+    auto links = apiClient.getGoogleMapLinks(RouteType::BRUTE_FORCE);
     cout << "Optimal route Google Maps links:\n";
     for (const auto& link : links) {
         cout << link << "\n";

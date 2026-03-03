@@ -16,15 +16,15 @@ public:
     explicit ApiClient(const std::string& host, const std::string& bearer);
     float getTotalMoneyEarnt(bool pending);
     std::string getName();
-    std::vector<std::string> getGoogleMapLinks(const std::string& bearer, RouteType route);
+    std::vector<std::string> getGoogleMapLinks(const RouteType route);
     httplib::Headers headers;
 
 private:
     httplib::Client cli;
     httplib::Headers buildHeaders(const std::string& bearer) const;
-
     json convertCoordinatesToJson(const std::vector<std::pair<double, double>>& coordinates) const;
-
     json getDistanceMatrix(const json& body) const;
+    std::vector<std::pair<double, double>> getBestRouteBruteForce(const json& distanceMatrix) const;
+    std::string convertRouteToGoogleMapsLink(const std::vector<std::pair<double, double>>& route) const;
     
 };

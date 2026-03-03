@@ -106,7 +106,7 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const std::string& bearer,
 
     for (const auto& audit : j["items"]) {
         auto coords = audit["site_coordinates"];
-        coordinatePairs.emplace_back(coords["lat"].get<double>(), coords["lng"].get<double>());
+        coordinatePairs.emplace_back(coords["lng"].get<double>(), coords["lat"].get<double>());
     } // now we have all pairs of coordinates left over
 
     //send distance matrix request to api, get back the distance matrix, and then we can work out the routes from there.
@@ -133,10 +133,12 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const std::string& bearer,
 
 json ApiClient::convertCoordinatesToJson(const std::vector<std::pair<double, double>>& coordinates) const {
     json body;
-    body["coordinates"] = json::array();
+    body["locations"] = json::array();
 
     for (const auto& [lng, lat] : coordinates) {
-        body["coordinates"].push_back({lng, lat});
+        if (lat >= 52.0 && lat <= 53.0 && lng >= -2.0 && lng <= -1.0) {
+            body["locations"].push_back({lng, lat});
+        }
     }
     return body;
 }
@@ -147,20 +149,17 @@ json ApiClient::getDistanceMatrix(const json& body) const {
 
     auto headers = httplib::Headers {
         { "Accept", "application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8" },
-        { "Authorization", OPENROUTE_API},
-        { "Content-Type", "application/json; charset=utf-8" }
+        { "Authorization", OPENROUTE_API}
     };
-    std::cout << body.dump() << "\n";
-    auto res = cli.Post("/v2/directions/driving-car", headers, body.dump(), "application/json");
+    
+    auto res = cli.Post("/v2/matrix/driving-car", headers, body.dump(), "application/json");
 
     
-    std::cout << res << "\n";
+
     if (!res || res->status != 200) {
         std::cerr << "Failed to get distance matrix\n";
         return {};
     }
-    std::cout << "Distance matrix response: " << res->body << "\n";
-
     return json::parse(res->body);
 }
 

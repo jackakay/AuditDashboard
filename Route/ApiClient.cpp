@@ -2,6 +2,7 @@
 #include <iostream>
 
 const float HOLIDAY_PAY = 1.12;
+const std::string OPENROUTE_API = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjU2NTIwMzgxMGRiZTQ2NmU5MDg2MTY2OGUwM2I0OWE4IiwiaCI6Im11cm11cjY0In0=";
 
 ApiClient::ApiClient(const std::string& host, const std::string& bearer)
     : cli(host)
@@ -21,6 +22,8 @@ httplib::Headers ApiClient::buildHeaders(const std::string& bearer) const {
         { "Referer", "https://www.secure-servelegal.co.uk/audits?status=assigned" }//is this wrong?
     };
 }
+
+
 
 float ApiClient::getTotalMoneyEarnt(bool pendingMoney = false) {
 
@@ -64,6 +67,7 @@ float ApiClient::getTotalMoneyEarnt(bool pendingMoney = false) {
 
 std::string ApiClient::getName() {
     auto res = cli.Get("/api/v1/auditors/me", headers);
+    
     if (!res || res->status != 200) {
         std::cerr << "Failed to get auditor info\n";
         return "";
@@ -81,6 +85,37 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const std::string& bearer,
     //to-do: need to figure out how big of an api request we can make, and figure out how to do it.
 
     // i will be using this api https://openrouteservice.org/dev/#/api-docs
+
+    const std::string basePath = "/api/v3/audits?status=assigned";
+    auto headers = ApiClient::headers;
+    auto res = cli.Get(basePath.c_str(), headers);
+
+    if (!res) {
+        std::cerr << "Request failed (network/SSL error)\n";
+        return {};
+    }
+
+    if (res->status != 200) {
+        std::cerr << "HTTP error: " << res->status << "\n";
+        std::cerr << res->body << "\n";
+        return {};
+    }
+
+    json j = json::parse(res->body);
+    std::vector<std::pair<double, double>> coordinatePairs;
+
+    for (const auto& audit : j["items"]) {
+        auto coords = audit["site_coordinates"];
+        coordinatePairs.emplace_back(coords["lat"].get<double>(), coords["lng"].get<double>());
+    } // now we have all pairs of coordinates left over
+
+    //send distance matrix request to api, get back the distance matrix, and then we can work out the routes from there.
+
+    json distanceMatrix = getDistanceMatrix(convertCoordinatesToJson(coordinatePairs));
+
+
+
+
     switch (route) {
         case RouteType::NEAREST_NEIGHBOUR:
             // ...
@@ -94,5 +129,38 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const std::string& bearer,
     }
 
     return links;
+}
+
+json ApiClient::convertCoordinatesToJson(const std::vector<std::pair<double, double>>& coordinates) const {
+    json body;
+    body["coordinates"] = json::array();
+
+    for (const auto& [lng, lat] : coordinates) {
+        body["coordinates"].push_back({lng, lat});
+    }
+    return body;
+}
+json ApiClient::getDistanceMatrix(const json& body) const {
+    
+    httplib::Client cli("api.openrouteservice.org");
+    cli.set_follow_location(true);
+
+    auto headers = httplib::Headers {
+        { "Accept", "application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8" },
+        { "Authorization", OPENROUTE_API},
+        { "Content-Type", "application/json; charset=utf-8" }
+    };
+    std::cout << body.dump() << "\n";
+    auto res = cli.Post("/v2/directions/driving-car", headers, body.dump(), "application/json");
+
+    
+    std::cout << res << "\n";
+    if (!res || res->status != 200) {
+        std::cerr << "Failed to get distance matrix\n";
+        return {};
+    }
+    std::cout << "Distance matrix response: " << res->body << "\n";
+
+    return json::parse(res->body);
 }
 

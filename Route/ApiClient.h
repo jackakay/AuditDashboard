@@ -22,5 +22,9 @@ public:
 private:
     httplib::Client cli;
     httplib::Headers buildHeaders(const std::string& bearer) const;
+
+    json convertCoordinatesToJson(const std::vector<std::pair<double, double>>& coordinates) const;
+
+    json getDistanceMatrix(const json& body) const;
     
 };

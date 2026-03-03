@@ -20,6 +20,8 @@ void Dashboard::start() {
         }
         else if (choice == 2) {
             handleViewTotalMoney(true);
+        }else if(choice == 3) {
+            handleGetRoute();
         }
         else {
             exit(0);
@@ -43,6 +45,11 @@ void Dashboard::handleViewTotalMoney(bool isPending) {
 }
 
 void Dashboard::handleGetRoute() const {
-    cout << "Optimal route feature coming soon!\n";
+    
+    auto links = apiClient.getGoogleMapLinks("", RouteType::NEAREST_NEIGHBOUR);
+    cout << "Optimal route Google Maps links:\n";
+    for (const auto& link : links) {
+        cout << link << "\n";
+    }
 }
 

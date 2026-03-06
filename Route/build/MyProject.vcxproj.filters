@@ -10,6 +10,9 @@
     <ClCompile Include="C:\Users\User\Documents\Route\AuditDashboard\Route\Dashboard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\User\Documents\Route\AuditDashboard\Route\Utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="C:\Users\User\Documents\Route\AuditDashboard\Route\ApiClient.h">
@@ -22,6 +25,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\User\Documents\Route\AuditDashboard\Route\httplib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\User\Documents\Route\AuditDashboard\Route\Utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

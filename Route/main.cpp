@@ -1,11 +1,10 @@
 ﻿#include "ApiClient.h"
 #include "Dashboard.h"
+#include "Utils.h"
 using namespace std;
 
 int main() {
-    string bearer;
-    cout << "Enter your bearer token: ";
-    cin >> bearer;
+    string bearer = Utils::readBearerToken("bearer.txt");
     ApiClient apiClient("www.secure-servelegal.co.uk", bearer);
     Dashboard dashboard(apiClient);
 

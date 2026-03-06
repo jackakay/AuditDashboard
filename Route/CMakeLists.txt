@@ -12,4 +12,6 @@ add_executable(MyProject
     Dashboard.h
     json.hpp
     httplib.h
+    Utils.cpp
+    Utils.h
 )

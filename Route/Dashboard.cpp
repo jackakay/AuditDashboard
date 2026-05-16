@@ -9,7 +9,7 @@ void Dashboard::start(int port) {
     std::cout << "Dashboard running at http://localhost:" << port << "\n";
     const char* port_env = std::getenv("PORT");
     int portFromEnv = port_env ? std::stoi(port_env) : port;
-    svr.listen("localhost", portFromEnv);
+    svr.listen("0.0.0.0", portFromEnv);
 }
 
 void Dashboard::registerRoutes() {

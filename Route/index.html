@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Dashboard</title>
+<title>Serve Legal Audit Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
@@ -34,14 +34,14 @@
   /* LOGIN */
   #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
   .login-box { background: var(--nord1); border: 1px solid var(--nord2); border-radius: var(--radius-lg); padding: 2.5rem 2rem; width: 100%; max-width: 360px; }
-  .login-wordmark { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--nord8); text-transform: uppercase; margin-bottom: 1.5rem; }
+  .login-wordmark { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 500; letter-spacing: 0.12em; color: var(--nord8); text-transform: uppercase; margin-bottom: 1.5rem; }
   .login-heading { font-size: 22px; font-weight: 500; color: var(--nord6); margin-bottom: 0.25rem; }
   .login-sub { font-size: 13px; color: var(--nord3); margin-bottom: 2rem; }
   .field { margin-bottom: 1rem; }
   .field label { display: block; font-size: 11px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--nord3); margin-bottom: 6px; }
   .field input { width: 100%; height: 38px; background: var(--nord0); border: 1px solid var(--nord2); border-radius: var(--radius); color: var(--nord5); font-family: 'Inter', sans-serif; font-size: 14px; padding: 0 12px; outline: none; transition: border-color 0.15s; }
   .field input:focus { border-color: var(--nord8); }
-  .login-btn { width: 100%; height: 38px; background: var(--nord10); border: none; border-radius: var(--radius); color: var(--nord6); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 0.5rem; transition: background 0.15s, transform 0.1s; }
+  .login-btn { width: 100%; height: 38px; background: var(--nord10); border: none; border-radius: var(--radius); color: var(--nord0); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 0.5rem; transition: background 0.15s, transform 0.1s; }
   .login-btn:hover { background: var(--nord9); }
   .login-btn:active { transform: scale(0.98); }
   .login-btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -165,7 +165,7 @@
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-box">
-    <div class="login-wordmark">serve legal</div>
+    <div class="login-wordmark">Serve Legal</div>
     <h1 class="login-heading">Sign in</h1>
     <p class="login-sub">Enter your credentials to continue</p>
     <div class="field">
@@ -277,7 +277,7 @@
       <!-- NOTES -->
       <div class="page" id="page-notes">
         <p class="page-title">Auto-complete notes</p>
-        <p class="page-sub">Draft audit notes for your assigned sites</p>
+        <p class="page-sub">Select the audit you would like to generate the notes for.</p>
         <div class="notes-list" id="notes-list">
           <div style="font-size:13px;color:var(--nord3)">Loading audits…</div>
         </div>
@@ -686,21 +686,7 @@ function showPayslipDetail(i) {
   }
 
   function loadNotes() {
-    const list = document.getElementById('notes-list');
-    if (auditCache.length === 0) {
-      list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">No audits to write notes for.</div>';
-      return;
-    }
-    list.innerHTML = auditCache.map((a, i) => `
-      <div class="note-item">
-        <div class="note-site">${a.site_name} <span style="font-weight:400;color:var(--nord3);font-size:11px">· ${a.site_post_code}</span></div>
-        <textarea class="note-textarea" id="note-${i}" placeholder="Write your audit notes here…"></textarea>
-        <div class="note-actions">
-          <button class="note-btn suggest" onclick="suggestNote(${i}, '${(a.site_name||'').replace(/'/g,"\\'")}', '${(a.item_to_order||'').replace(/'/g,"\\'")}')">Suggest draft</button>
-          <button class="note-btn" onclick="clearNote(${i})">Clear</button>
-        </div>
-      </div>
-    `).join('');
+    //functionality for the notes here
   }
 
   function clearNote(i) { document.getElementById('note-' + i).value = ''; }

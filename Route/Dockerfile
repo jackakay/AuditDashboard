@@ -27,6 +27,8 @@ WORKDIR /root/
 # NOTE: Replace 'YOUR_EXECUTABLE_NAME' with the target name 
 # defined in your CMakeLists.txt (inside your add_executable() command)
 COPY --from=builder /app/build/WebServer ./server
+# Copy the index.html file from the root of the builder stage into the runner's working directory
+COPY --from=builder /app/index.html ./index.html
 
 # Expose the default container port
 EXPOSE 8080

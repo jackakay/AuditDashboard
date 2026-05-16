@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+  --nord0:  #1e1e2e;
+  --nord1:  #181825;
+  --nord2:  #313244;
+  --nord3:  #45475a;
+  --nord4:  #cdd6f4;
+  --nord5:  #bac2de;
+  --nord6:  #a6adc8;
+  --nord7:  #94e2d5;
+  --nord8:  #89dceb;
+  --nord9:  #74c7ec;
+  --nord10: #89b4fa;
+  --nord11: #f38ba8;
+  --nord12: #fab387;
+  --nord13: #f9e2af;
+  --nord14: #a6e3a1;
+  --nord15: #cba6f7;
+  --radius: 8px; --radius-lg: 12px; --sidebar-w: 200px;
+}
+
+  html, body { height: 100%; background: var(--nord0); color: var(--nord4); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; }
+
+  /* LOGIN */
+  #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .login-box { background: var(--nord1); border: 1px solid var(--nord2); border-radius: var(--radius-lg); padding: 2.5rem 2rem; width: 100%; max-width: 360px; }
+  .login-wordmark { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--nord8); text-transform: uppercase; margin-bottom: 1.5rem; }
+  .login-heading { font-size: 22px; font-weight: 500; color: var(--nord6); margin-bottom: 0.25rem; }
+  .login-sub { font-size: 13px; color: var(--nord3); margin-bottom: 2rem; }
+  .field { margin-bottom: 1rem; }
+  .field label { display: block; font-size: 11px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--nord3); margin-bottom: 6px; }
+  .field input { width: 100%; height: 38px; background: var(--nord0); border: 1px solid var(--nord2); border-radius: var(--radius); color: var(--nord5); font-family: 'Inter', sans-serif; font-size: 14px; padding: 0 12px; outline: none; transition: border-color 0.15s; }
+  .field input:focus { border-color: var(--nord8); }
+  .login-btn { width: 100%; height: 38px; background: var(--nord10); border: none; border-radius: var(--radius); color: var(--nord6); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 0.5rem; transition: background 0.15s, transform 0.1s; }
+  .login-btn:hover { background: var(--nord9); }
+  .login-btn:active { transform: scale(0.98); }
+  .login-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .login-error { font-size: 12px; color: var(--nord11); margin-top: 0.75rem; min-height: 18px; text-align: center; }
+  .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(236,239,244,0.3); border-top-color: var(--nord6); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* SHELL */
+  #dashboard-screen { display: none; min-height: 100vh; flex-direction: column; }
+  .topbar { background: var(--nord1); border-bottom: 1px solid var(--nord2); padding: 0 1.5rem; height: 52px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .topbar-left { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nord8); }
+  .topbar-right { display: flex; align-items: center; gap: 1rem; }
+  .topbar-name { font-size: 13px; color: var(--nord4); }
+  .logout-btn { background: none; border: 1px solid var(--nord2); border-radius: var(--radius); color: var(--nord3); font-family: 'Inter', sans-serif; font-size: 12px; padding: 5px 12px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+  .logout-btn:hover { border-color: var(--nord11); color: var(--nord11); }
+  .shell { display: flex; flex: 1; min-height: calc(100vh - 52px); }
+
+  /* SIDEBAR */
+  .sidebar { width: var(--sidebar-w); background: var(--nord1); border-right: 1px solid var(--nord2); padding: 1rem 0; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 1.25rem; font-size: 13px; color: var(--nord3); cursor: pointer; border-left: 2px solid transparent; transition: color 0.15s, background 0.15s, border-color 0.15s; user-select: none; }
+  .nav-item:hover { color: var(--nord5); background: var(--nord2); }
+  .nav-item.active { color: var(--nord8); border-left-color: var(--nord8); background: var(--nord2); }
+  .nav-section { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nord3); padding: 0.75rem 1.25rem 0.25rem; margin-top: 0.5rem; }
+
+  /* PAGES */
+  .page-content { flex: 1; padding: 2rem; overflow-y: auto; }
+  .page { display: none; max-width: 900px; }
+  .page.active { display: block; }
+  .page-title { font-size: 18px; font-weight: 500; color: var(--nord6); margin-bottom: 0.25rem; }
+  .page-sub { font-size: 13px; color: var(--nord3); margin-bottom: 1.75rem; }
+  .section-label { font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nord3); margin-bottom: 1rem; }
+  .api-error { font-size: 12px; color: var(--nord11); margin-top: 8px; }
+
+  /* STAT CARDS */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 2rem; }
+  .stat-card { background: var(--nord1); border: 1px solid var(--nord2); border-radius: var(--radius-lg); padding: 1.25rem 1.25rem 1rem; }
+  .stat-label { font-size: 11px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--nord3); margin-bottom: 8px; }
+  .stat-value { font-size: 26px; font-weight: 500; color: var(--nord6); font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
+  .stat-accent { color: var(--nord14); }
+  .stat-pending { color: var(--nord13); }
+
+  /* AUDIT TABLE */
+  .table-wrap { background: var(--nord1); border: 1px solid var(--nord2); border-radius: var(--radius-lg); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { font-size: 11px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--nord3); padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--nord2); background: var(--nord1); }
+  tbody tr { border-bottom: 1px solid var(--nord2); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--nord2); }
+  tbody td { padding: 12px 16px; vertical-align: middle; }
+  .tbl-primary { font-size: 13px; font-weight: 500; color: var(--nord5); }
+  .tbl-secondary { font-size: 11px; color: var(--nord3); margin-top: 2px; }
+  .table-empty { font-size: 13px; color: var(--nord3); padding: 1.5rem; }
+  .deadline-badge { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--nord4); }
+  .deadline-badge.warn { color: var(--nord13); }
+  .deadline-badge.urgent { color: var(--nord11); }
+  .days-left { font-size: 11px; color: var(--nord3); margin-left: 6px; }
+  .days-left.warn { color: var(--nord13); }
+  .days-left.urgent { color: var(--nord11); }
+  .pay-cell { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--nord14); }
+  .info-btn { background: var(--nord0); border: 1px solid var(--nord2); border-radius: var(--radius); color: var(--nord4); font-family: 'Inter', sans-serif; font-size: 12px; padding: 4px 12px; cursor: pointer; transition: border-color 0.15s, color 0.15s; white-space: nowrap; }
+  .info-btn:hover { border-color: var(--nord8); color: var(--nord8); }
+
+  /* MODAL */
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(17,17,27,0.80); z-index: 100; align-items: center; justify-content: center; padding: 2rem; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--nord1); border: 1px solid var(--nord2); border-radius: var(--radius-lg); padding: 1.75rem; width: 100%; max-width: 520px; max-height: 80vh; overflow-y: auto; }
+  .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+  .modal-title { font-size: 16px; font-weight: 500; color: var(--nord6); }
+  .modal-subtitle { font-size: 12px; color: var(--nord3); margin-top: 2px; }
+  .modal-close { background: none; border: none; color: var(--nord3); font-size: 20px; cursor: pointer; line-height: 1; padding: 0; flex-shrink: 0; }
+  .modal-close:hover { color: var(--nord11); }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-field { background: var(--nord0); border: 1px solid var(--nord2); border-radius: var(--radius); padding: 10px 12px; }
+  .modal-field-label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nord3); margin-bottom: 3px; }
+  .modal-field-value { font-size: 13px; color: var(--nord5); }
+  .modal-field.full { grid-column: 1 / -1; }
+  .modal-field-value.mono { font-family: 'JetBrains Mono', monospace; }
+  .modal-field-value.green { color: var(--nord14); }
+  .modal-field-value.amber { color: var(--nord13); }
+  .modal-field-value.red { color: var(--nord11); }
+  .expenses-text { font-size: 12px; color: var(--nord4); line-height: 1.6; white-space: pre-wrap; }
+
+  /* ROUTE */
+  .route-card { background: var(--nord1); border: 1px solid var(--nord2); border-radius: var(--radius-lg); padding: 1.25rem; }
+  .route-controls { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+  .route-btn { background: var(--nord0); border: 1px solid var(--nord2); border-radius: var(--radius); color: var(--nord4); font-family: 'Inter', sans-serif; font-size: 13px; padding: 6px 14px; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+  .route-btn:hover { border-color: var(--nord8); color: var(--nord8); }
+  .route-btn.active { background: var(--nord2); border-color: var(--nord8); color: var(--nord8); }
+  .route-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .generate-btn { background: var(--nord10); border: none; border-radius: var(--radius); color: var(--nord6); font-family: 'Inter', sans-serif; font-size: 13px; padding: 6px 16px; cursor: pointer; transition: background 0.15s; margin-left: auto; }
+  .generate-btn:hover { background: var(--nord9); }
+  .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .route-links { display: flex; flex-direction: column; gap: 8px; }
+  .route-link-item { display: flex; align-items: center; gap: 10px; background: var(--nord0); border: 1px solid var(--nord2); border-radius: var(--radius); padding: 10px 14px; }
+  .route-link-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--nord3); min-width: 20px; }
+  .route-link-url { font-size: 12px; color: var(--nord8); text-decoration: none; word-break: break-all; flex: 1; }
+  .route-link-url:hover { color: var(--nord7); text-decoration: underline; }
+  .route-empty { font-size: 13px; color: var(--nord3); padding: 0.5rem 0; }
+
+  /* PAYSLIPS */
+  .payslip-list { display: flex; flex-direction: column; gap: 8px; }
+  .payslip-item { background: var(--nord1); border: 1px solid var(--nord2); border-radius: var(--radius-lg); padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; }
+  .payslip-period { font-size: 14px; color: var(--nord5); }
+  .payslip-amount { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--nord14); }
+
+  /* NOTES */
+  .notes-list { display: flex; flex-direction: column; gap: 8px; }
+  .note-item { background: var(--nord1); border: 1px solid var(--nord2); border-radius: var(--radius-lg); padding: 1rem 1.25rem; }
+  .note-site { font-size: 13px; font-weight: 500; color: var(--nord5); margin-bottom: 6px; }
+  .note-textarea { width: 100%; background: var(--nord0); border: 1px solid var(--nord2); border-radius: var(--radius); color: var(--nord4); font-family: 'Inter', sans-serif; font-size: 13px; padding: 8px 10px; resize: vertical; min-height: 70px; outline: none; transition: border-color 0.15s; }
+  .note-textarea:focus { border-color: var(--nord8); }
+  .note-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .note-btn { background: var(--nord0); border: 1px solid var(--nord2); border-radius: var(--radius); color: var(--nord4); font-family: 'Inter', sans-serif; font-size: 12px; padding: 5px 12px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+  .note-btn:hover { border-color: var(--nord8); color: var(--nord8); }
+  .note-btn.suggest { border-color: var(--nord15); color: var(--nord15); }
+  .note-btn.suggest:hover { background: var(--nord2); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-wordmark">serve legal</div>
+    <h1 class="login-heading">Sign in</h1>
+    <p class="login-sub">Enter your credentials to continue</p>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="usr" placeholder="you@example.com" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="pwd" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Sign in</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard-screen">
+  <div class="topbar">
+    <div class="topbar-left">serve legal</div>
+    <div class="topbar-right">
+      <span class="topbar-name" id="topbar-name"></span>
+      <button class="logout-btn" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="shell">
+    <nav class="sidebar">
+      <div class="nav-item active" data-page="home" onclick="navigate('home')">
+        <span>⌂</span> Home
+      </div>
+      <div class="nav-section">Tools</div>
+      <div class="nav-item" data-page="payslips" onclick="navigate('payslips')">
+        <span>£</span> Payslips
+      </div>
+      <div class="nav-item" data-page="routes" onclick="navigate('routes')">
+        <span>⊕</span> Route generation
+      </div>
+      <div class="nav-item" data-page="notes" onclick="navigate('notes')">
+        <span>✎</span> Auto-complete notes
+      </div>
+    </nav>
+
+    <div class="page-content">
+
+      <!-- HOME -->
+      <div class="page active" id="page-home">
+        <p class="page-title">Overview</p>
+        <p class="page-sub">Your currently assigned audits</p>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">Pending pay</div>
+            <div class="stat-value stat-pending" id="stat-pending">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Inc. holiday pay</div>
+            <div class="stat-value stat-accent" id="stat-holiday">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Assigned audits</div>
+            <div class="stat-value" id="stat-count">—</div>
+          </div>
+        </div>
+        <div class="section-label">Current audits</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Audit</th>
+                <th>Deadline</th>
+                <th>Pay</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="audit-tbody">
+              <tr><td colspan="4" class="table-empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="api-error" id="home-error"></div>
+      </div>
+
+      <!-- PAYSLIPS -->
+      <div class="page" id="page-payslips">
+        <p class="page-title">Payslips</p>
+        <p class="page-sub">Your payment history</p>
+        <div class="payslip-list" id="payslip-list">
+          <div style="font-size:13px;color:var(--nord3)">Loading payslips…</div>
+        </div>
+        <div class="api-error" id="payslips-error"></div>
+      </div>
+
+      <!-- ROUTES -->
+      <div class="page" id="page-routes">
+        <p class="page-title">Route generation</p>
+        <p class="page-sub">Optimise your audit visits</p>
+        <div class="route-card">
+          <div class="route-controls">
+            <button class="route-btn active" id="btn-nn" onclick="selectRoute('nearest')">Nearest neighbour</button>
+            <button class="route-btn" id="btn-bf" onclick="selectRoute('brute')">Brute force</button>
+            <button class="generate-btn" id="fetch-btn" onclick="fetchRoute()">Generate route</button>
+          </div>
+          <div class="route-links" id="route-links">
+            <div class="route-empty">Select a method and generate a route.</div>
+          </div>
+          <div class="api-error" id="route-error"></div>
+        </div>
+      </div>
+
+      <!-- NOTES -->
+      <div class="page" id="page-notes">
+        <p class="page-title">Auto-complete notes</p>
+        <p class="page-sub">Draft audit notes for your assigned sites</p>
+        <div class="notes-list" id="notes-list">
+          <div style="font-size:13px;color:var(--nord3)">Loading audits…</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- AUDIT DETAIL MODAL -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-title">Audit details</div>
+        <div class="modal-subtitle" id="modal-subtitle"></div>
+      </div>
+      <button class="modal-close" onclick="closeModalDirect()">×</button>
+    </div>
+    <div class="modal-grid" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+  const SERVELEGAL = 'https://www.secure-servelegal.co.uk';
+  const LOCAL      = '';           // C++ server — only used for login + route
+  const HOLIDAY_RATE = 1.12;
+  let selectedRoute = 'nearest';
+  let auditCache = [];
+  let payslipData = null;
+
+  // Direct to servelegal — all data calls
+  function sl(path) {
+    const token = sessionStorage.getItem('bearer');
+    return fetch(SERVELEGAL + path, {
+      headers: {
+        'Authorization': 'Bearer ' + (token || ''),
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://www.secure-servelegal.co.uk/'
+      }
+    });
+  }
+
+  // To local C++ server — login and route only
+  function local(path, options) {
+    return fetch(LOCAL + path, options);
+  }
+
+  function navigate(page) {
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    if (page === 'payslips') loadPayslips();
+    if (page === 'notes') loadNotes();
+  }
+
+  async function doLogin() {
+    const username = document.getElementById('usr').value.trim();
+    const password = document.getElementById('pwd').value;
+    const btn = document.getElementById('login-btn');
+    const err = document.getElementById('login-error');
+    if (!username || !password) { err.textContent = 'Please enter your email and password.'; return; }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Signing in…';
+    err.textContent = '';
+    try {
+      const res = await local('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Login failed');
+      sessionStorage.setItem('bearer', data.bearer);   // data.bearer as confirmed
+      showDashboard();
+    } catch (e) {
+      err.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Sign in';
+    }
+  }
+
+  function showDashboard() {
+    document.getElementById('login-screen').style.display = 'none';
+    const dash = document.getElementById('dashboard-screen');
+    dash.style.display = 'flex';
+    dash.style.flexDirection = 'column';
+    loadName();
+    loadHomeData();
+  }
+
+  async function loadName() {
+    try {
+      const res = await sl('/api/v1/auditors/me');
+      const data = await res.json();
+      document.getElementById('topbar-name').textContent = data.preferred_name || '';
+    } catch (_) {}
+  }
+
+  async function loadHomeData() {
+    const tbody = document.getElementById('audit-tbody');
+    tbody.innerHTML = '<tr><td colspan="4" class="table-empty">Loading…</td></tr>';
+    try {
+      const res = await sl('/api/v3/audits?status=assigned');
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      auditCache = data.items || [];
+      const rawPay = auditCache.reduce((s, a) => s + (a.auditor_pay_per_audit || 0), 0);
+
+      document.getElementById('stat-count').textContent   = auditCache.length;
+      document.getElementById('stat-pending').textContent = '£' + rawPay.toFixed(2);
+      document.getElementById('stat-holiday').textContent = '£' + (rawPay * HOLIDAY_RATE).toFixed(2);
+
+      if (auditCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No audits currently assigned.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = auditCache.map((a, i) => {
+        const deadline    = new Date(a.deadline_date);
+        const daysLeft    = Math.ceil((deadline - Date.now()) / 86400000);
+        const urgency     = daysLeft <= 2 ? 'urgent' : daysLeft <= 5 ? 'warn' : '';
+        const deadlineStr = deadline.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        return `
+          <tr>
+            <td>
+              <div class="tbl-primary">${a.site_name}</div>
+              <div class="tbl-secondary">${a.site_post_code} · ${a.client_name}</div>
+            </td>
+            <td>
+              <span class="deadline-badge ${urgency}">${deadlineStr}</span>
+              <span class="days-left ${urgency}">${daysLeft}d left</span>
+            </td>
+            <td class="pay-cell">£${Number(a.auditor_pay_per_audit || 0).toFixed(2)}</td>
+            <td><button class="info-btn" onclick="showAuditDetail(${i})">Details</button></td>
+          </tr>
+        `;
+      }).join('');
+
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="4" class="table-empty">Could not load audits.</td></tr>';
+      document.getElementById('home-error').textContent = e.message;
+    }
+  }
+
+  function showAuditDetail(i) {
+    const a = auditCache[i];
+    if (!a) return;
+    const deadline    = new Date(a.deadline_date);
+    const daysLeft    = Math.ceil((deadline - Date.now()) / 86400000);
+    const urgency     = daysLeft <= 2 ? 'red' : daysLeft <= 5 ? 'amber' : '';
+    const deadlineStr = deadline.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const startStr    = new Date(a.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const endStr      = new Date(a.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    document.getElementById('modal-title').textContent    = a.site_name;
+    document.getElementById('modal-subtitle').textContent = a.internal_id + ' · ' + a.client_name;
+    document.getElementById('modal-body').innerHTML = `
+      <div class="modal-field">
+        <div class="modal-field-label">Post code</div>
+        <div class="modal-field-value">${a.site_post_code}</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Visit type</div>
+        <div class="modal-field-value">${a.item_to_order}</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Base pay</div>
+        <div class="modal-field-value mono green">£${Number(a.auditor_pay_per_audit).toFixed(2)}</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Inc. holiday pay</div>
+        <div class="modal-field-value mono green">£${(a.auditor_pay_per_audit * HOLIDAY_RATE).toFixed(2)}</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Deadline</div>
+        <div class="modal-field-value ${urgency}">${deadlineStr} (${daysLeft}d left)</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Order window</div>
+        <div class="modal-field-value">${startStr} – ${endStr}</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Order ID</div>
+        <div class="modal-field-value mono">${a.order_internal_id}</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Schedule</div>
+        <div class="modal-field-value">${a.order_schedule_type.replace(/_/g, ' ')}</div>
+      </div>
+      <div class="modal-field full">
+        <div class="modal-field-label">Expenses</div>
+        <div class="expenses-text">${(a.estimated_expenses || 'None').trim()}</div>
+      </div>
+    `;
+    document.getElementById('modal-backdrop').classList.add('open');
+  }
+
+  function closeModal(e) { if (e.target === document.getElementById('modal-backdrop')) closeModalDirect(); }
+  function closeModalDirect() { document.getElementById('modal-backdrop').classList.remove('open'); }
+
+async function loadPayslips() {
+  const list = document.getElementById('payslip-list');
+
+  // if already loaded, just re-render from cache
+  if (payslipData) {
+    renderPayslips(payslipData);
+    return;
+  }
+
+  list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Loading…</div>';
+  try {
+    const res = await sl('/api/v3/audits?limit=200&status=approved,approving_query,submitted,client_query');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const numPages = data.pages;
+    let items = data.items || [];
+
+    for (let i = 2; i <= numPages; i++) {
+      const r = await sl('/api/v3/audits?limit=200&status=approved,approving_query,submitted,client_query&page=' + i);
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      items.push(...(d.items || []));
+    }
+
+    payslipData = items;  // cache it
+    renderPayslips(items);
+
+  } catch (e) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Could not load payslips.</div>';
+    document.getElementById('payslips-error').textContent = e.message;
+  }
+}
+
+
+  async function renderPayslips(items) {
+    const list = document.getElementById('payslip-list');
+  
+    list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Loading…</div>';
+    try{
+    const total            = items.reduce((s, a) => s + (Number(a.auditor_pay_per_audit) || 0), 0);
+    const mileage          = items.reduce((s, a) => s + (Number(a.mileage) || 0), 0);
+    const reclaimableRaw   = items.reduce((s, a) => {
+      const fields = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4'];
+      return s + fields.reduce((s2, k) => s2 + (Number(a[k]) || 0), 0);
+    }, 0);
+    const totalWithHoliday  = total * HOLIDAY_RATE;
+    const totalWithExpenses = totalWithHoliday + reclaimableRaw + (mileage * 0.24);
+
+    // generate biweekly periods from first cutoff
+    const periods = [];
+    let cutoff  = new Date('2026-01-05T00:00:00Z');
+    let payDate = new Date('2026-01-14T00:00:00Z');
+    const today = new Date();
+
+    while (cutoff <= today) {
+      const periodStart = new Date(cutoff.getTime() - 14 * 86400000);
+      periods.push({ periodStart, periodEnd: new Date(cutoff), payDate: new Date(payDate), audits: [] });
+      cutoff  = new Date(cutoff.getTime()  + 14 * 86400000);
+      payDate = new Date(payDate.getTime() + 14 * 86400000);
+    }
+
+    // bucket by approval_date
+    items.forEach(a => {
+      if (!a.approval_date) return;
+      const approved = new Date(a.approval_date);
+      const period = periods.find(p => approved >= p.periodStart && approved < p.periodEnd);
+      if (period) period.audits.push(a);
+    });
+
+    const filled = periods
+      .filter(p => p.audits.length > 0)
+      .sort((a, b) => b.payDate - a.payDate);
+
+    window.payslipCache = filled;
+
+    const fmt = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    list.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total earned</div>
+          <div class="stat-value stat-accent">£${total.toFixed(2)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Inc. holiday pay</div>
+          <div class="stat-value stat-accent">£${totalWithHoliday.toFixed(2)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Audits completed</div>
+          <div class="stat-value">${items.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total + expenses</div>
+          <div class="stat-value stat-accent">£${totalWithExpenses.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:1.5rem">
+        <table>
+          <thead>
+            <tr>
+              <th>Pay date</th>
+              <th>Earnings</th>
+              <th>Earnings + expenses</th>
+              <th>Pay period</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filled.map((p, i) => {
+              const earnings = p.audits.reduce((s, a) => s + (Number(a.auditor_pay_per_audit) || 0), 0);
+              const expenses = p.audits.reduce((s, a) => {
+                const fields = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4'];
+                return s + fields.reduce((s2, k) => s2 + (Number(a[k]) || 0), 0);
+              }, 0);
+              const periodMileage = p.audits.reduce((s, a) => s + (Number(a.mileage) || 0), 0);
+              const earningsWithHoliday = earnings * HOLIDAY_RATE;
+              const earningsWithAll = earningsWithHoliday + expenses + (periodMileage * 0.24);
+              return `
+                <tr>
+                  <td><span class="deadline-badge">${fmt(p.payDate)}</span></td>
+                  <td class="pay-cell">£${earningsWithHoliday.toFixed(2)}</td>
+                  <td class="pay-cell">£${earningsWithAll.toFixed(2)}</td>
+                  <td><span class="tbl-secondary">${fmt(p.periodStart)} – ${fmt(p.periodEnd)}</span></td>
+                  <td><button class="info-btn" onclick="showPayslipDetail(${i})">Details</button></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+  } catch (e) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Could not load payslips.</div>';
+    document.getElementById('payslips-error').textContent = e.message;
+  }
+}
+
+function showPayslipDetail(i) {
+  const p = window.payslipCache[i];
+  if (!p) return;
+  const fmt = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  document.getElementById('modal-title').textContent    = fmt(p.periodStart) + ' – ' + fmt(p.periodEnd);
+  document.getElementById('modal-subtitle').textContent = 'Pay date: ' + fmt(p.payDate);
+
+  document.getElementById('modal-body').innerHTML = p.audits.map(a => {
+    const expenses = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4']
+      .reduce((s, k) => s + (Number(a[k]) || 0), 0);
+    const mileagePay = (Number(a.mileage) || 0) * 0.24;
+    return `
+      <div class="modal-field full">
+        <div class="modal-field-label">${a.site_name} · ${a.internal_id}</div>
+        <div style="display:flex;gap:1rem;margin-top:4px;flex-wrap:wrap">
+          <span class="modal-field-value green">Pay: £${Number(a.auditor_pay_per_audit || 0).toFixed(2)}</span>
+          <span class="modal-field-value" style="color:var(--nord9)">Expenses: £${expenses.toFixed(2)}</span>
+          <span class="modal-field-value" style="color:var(--nord9)">Mileage: £${mileagePay.toFixed(2)}</span>
+          <span class="modal-field-value" style="color:var(--nord3);font-size:11px">${fmt(new Date(a.approval_date))}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('modal-backdrop').classList.add('open');
+}
+
+  function selectRoute(type) {
+    selectedRoute = type;
+    document.getElementById('btn-nn').classList.toggle('active', type === 'nearest');
+    document.getElementById('btn-bf').classList.toggle('active', type === 'brute');
+  }
+
+  async function fetchRoute() {
+    const btn = document.getElementById('fetch-btn');
+    const container = document.getElementById('route-links');
+    const errEl = document.getElementById('route-error');
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+    errEl.textContent = '';
+    container.innerHTML = '<div class="route-empty">Calculating…</div>';
+    try {
+      // route stays on local C++ server — this is where the algorithm lives
+      const res = await local('/api/route?type=' + selectedRoute, {
+        headers: { 'Authorization': sessionStorage.getItem('bearer') || '' }
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed');
+      const links = data.links || [];
+      if (links.length === 0) { container.innerHTML = '<div class="route-empty">No routes returned.</div>'; return; }
+      container.innerHTML = links.map((url, i) => `
+        <div class="route-link-item">
+          <span class="route-link-num">${String(i + 1).padStart(2, '0')}</span>
+          <a class="route-link-url" href="${url}" target="_blank" rel="noopener">${url}</a>
+        </div>
+      `).join('');
+    } catch (e) {
+      container.innerHTML = '<div class="route-empty">No routes to display.</div>';
+      errEl.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate route';
+    }
+  }
+
+  function loadNotes() {
+    const list = document.getElementById('notes-list');
+    if (auditCache.length === 0) {
+      list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">No audits to write notes for.</div>';
+      return;
+    }
+    list.innerHTML = auditCache.map((a, i) => `
+      <div class="note-item">
+        <div class="note-site">${a.site_name} <span style="font-weight:400;color:var(--nord3);font-size:11px">· ${a.site_post_code}</span></div>
+        <textarea class="note-textarea" id="note-${i}" placeholder="Write your audit notes here…"></textarea>
+        <div class="note-actions">
+          <button class="note-btn suggest" onclick="suggestNote(${i}, '${(a.site_name||'').replace(/'/g,"\\'")}', '${(a.item_to_order||'').replace(/'/g,"\\'")}')">Suggest draft</button>
+          <button class="note-btn" onclick="clearNote(${i})">Clear</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function clearNote(i) { document.getElementById('note-' + i).value = ''; }
+  function suggestNote(i, siteName, visitType) {
+    document.getElementById('note-' + i).value =
+      `Audit conducted at ${siteName}. Visit type: ${visitType}. All areas inspected in accordance with required standards. No significant issues identified at time of visit. Documentation reviewed and found to be in order.`;
+  }
+
+  function doLogout() {
+    sessionStorage.removeItem('bearer');
+    auditCache = [];
+    payslipData = null;
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('dashboard-screen').style.display = 'none';
+    document.getElementById('usr').value = '';
+    document.getElementById('pwd').value = '';
+    document.getElementById('stat-pending').textContent = '—';
+    document.getElementById('stat-holiday').textContent = '—';
+    document.getElementById('stat-count').textContent = '—';
+    document.getElementById('audit-tbody').innerHTML = '<tr><td colspan="4" class="table-empty">Loading…</td></tr>';
+    document.getElementById('route-links').innerHTML = '<div class="route-empty">Select a method and generate a route.</div>';
+    navigate('home');
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModalDirect();
+    if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin();
+  });
+</script>
+</body>
+</html>

@@ -305,6 +305,7 @@
   const SERVELEGAL = 'https://www.secure-servelegal.co.uk';
   const LOCAL      = '';           // C++ server — only used for login + route
   const HOLIDAY_RATE = 1.12;
+  const MILEAGE = 0.22; // per mile, as per Serve Legal's policy
   let selectedRoute = 'nearest';
   let auditCache = [];
   let payslipData = null;
@@ -519,14 +520,14 @@ async function loadPayslips() {
   
     list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Loading…</div>';
     try{
-    const total            = items.reduce((s, a) => s + (Number(a.auditor_pay_per_audit) || 0), 0);
+    const total            = items.reduce((s, a) => s + (Number(a.total_pay) || 0), 0);
     const mileage          = items.reduce((s, a) => s + (Number(a.mileage) || 0), 0);
     const reclaimableRaw   = items.reduce((s, a) => {
       const fields = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4'];
       return s + fields.reduce((s2, k) => s2 + (Number(a[k]) || 0), 0);
     }, 0);
-    const totalWithHoliday  = total * HOLIDAY_RATE;
-    const totalWithExpenses = totalWithHoliday + reclaimableRaw + (mileage * 0.24);
+    //const totalWithHoliday  = total * HOLIDAY_RATE;
+    const totalWithExpenses = total + reclaimableRaw + (mileage * MILEAGE);
 
     // generate biweekly periods from first cutoff
     const periods = [];
@@ -563,10 +564,7 @@ async function loadPayslips() {
           <div class="stat-label">Total earned</div>
           <div class="stat-value stat-accent">£${total.toFixed(2)}</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Inc. holiday pay</div>
-          <div class="stat-value stat-accent">£${totalWithHoliday.toFixed(2)}</div>
-        </div>
+        
         <div class="stat-card">
           <div class="stat-label">Audits completed</div>
           <div class="stat-value">${items.length}</div>
@@ -590,18 +588,18 @@ async function loadPayslips() {
           </thead>
           <tbody>
             ${filled.map((p, i) => {
-              const earnings = p.audits.reduce((s, a) => s + (Number(a.auditor_pay_per_audit) || 0), 0);
+              const earnings = p.audits.reduce((s, a) => s + (Number(a.total_pay) || 0), 0);
               const expenses = p.audits.reduce((s, a) => {
                 const fields = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4'];
                 return s + fields.reduce((s2, k) => s2 + (Number(a[k]) || 0), 0);
               }, 0);
               const periodMileage = p.audits.reduce((s, a) => s + (Number(a.mileage) || 0), 0);
-              const earningsWithHoliday = earnings * HOLIDAY_RATE;
-              const earningsWithAll = earningsWithHoliday + expenses + (periodMileage * 0.24);
+              //const earningsWithHoliday = earnings * HOLIDAY_RATE;
+              const earningsWithAll = earnings + expenses + (periodMileage * MILEAGE);
               return `
                 <tr>
                   <td><span class="deadline-badge">${fmt(p.payDate)}</span></td>
-                  <td class="pay-cell">£${earningsWithHoliday.toFixed(2)}</td>
+                  <td class="pay-cell">£${earnings.toFixed(2)}</td>
                   <td class="pay-cell">£${earningsWithAll.toFixed(2)}</td>
                   <td><span class="tbl-secondary">${fmt(p.periodStart)} – ${fmt(p.periodEnd)}</span></td>
                   <td><button class="info-btn" onclick="showPayslipDetail(${i})">Details</button></td>
@@ -630,12 +628,12 @@ function showPayslipDetail(i) {
   document.getElementById('modal-body').innerHTML = p.audits.map(a => {
     const expenses = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4']
       .reduce((s, k) => s + (Number(a[k]) || 0), 0);
-    const mileagePay = (Number(a.mileage) || 0) * 0.24;
+    const mileagePay = (Number(a.mileage) || 0) * MILEAGE;
     return `
       <div class="modal-field full">
         <div class="modal-field-label">${a.site_name} · ${a.internal_id}</div>
         <div style="display:flex;gap:1rem;margin-top:4px;flex-wrap:wrap">
-          <span class="modal-field-value green">Pay: £${Number(a.auditor_pay_per_audit || 0).toFixed(2)}</span>
+          <span class="modal-field-value green">Pay: £${Number(a.total_pay || 0).toFixed(2)}</span>
           <span class="modal-field-value" style="color:var(--nord9)">Expenses: £${expenses.toFixed(2)}</span>
           <span class="modal-field-value" style="color:var(--nord9)">Mileage: £${mileagePay.toFixed(2)}</span>
           <span class="modal-field-value" style="color:var(--nord3);font-size:11px">${fmt(new Date(a.approval_date))}</span>

@@ -4,10 +4,10 @@ FROM alpine:latest AS builder
 # Install build essentials: g++, make, and cmake
 RUN apk add --no-cache g++ make cmake
 
-RUN apk add --no-cache libstdc++ python3 py3-pip
+
 
 # 2. Install your Python dependencies
-RUN pip3 install pycognito --break-system-packages
+
 
 WORKDIR /app
 
@@ -25,6 +25,9 @@ FROM alpine:latest
 
 # Install runtime dependencies for C++ binaries on Alpine
 RUN apk add --no-cache libstdc++
+RUN apk add --no-cache libstdc++ python3 py3-pip
+RUN pip3 install pycognito --break-system-packages
+
 
 WORKDIR /root/
 

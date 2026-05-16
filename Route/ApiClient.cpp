@@ -215,7 +215,7 @@ json ApiClient::getDistanceMatrix(const json& body) const {
 
 
 std::string ApiClient::runPythonAuth(const std::string& username, const std::string& password) const {
-    std::string cmd = "python3 Auth.py " + username + " " + password;
+    std::string cmd = "python3 ./Auth.py " + username + " " + password;
 
     // Open pipe to python script
     FILE* pipe = _popen(cmd.c_str(), "r");

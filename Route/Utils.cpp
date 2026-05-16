@@ -12,4 +12,14 @@ namespace Utils {
         std::getline(file, token);
         return token;
     }
+
+    UserCredentials getUserCredentials() {
+        std::string username, password;
+        std::cout << "Enter your username: ";
+        std::cin >> username;
+        std::cout << "Enter your password: ";
+        std::cin >> password;
+        return UserCredentials{ username, password };
+    }
 }
+    

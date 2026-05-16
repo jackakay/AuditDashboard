@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(MyProject)
+project(WebServer)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(MyProject
+add_executable(WebServer
     main.cpp
     ApiClient.cpp
     ApiClient.h

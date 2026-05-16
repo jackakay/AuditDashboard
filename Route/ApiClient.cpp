@@ -1,16 +1,27 @@
 #include "ApiClient.h"
 #include <iostream>
 
+#if defined(_WIN32) || defined(_WIN64)
+    // Windows already has _popen and _pclose, keep them or alias if needed
+#else
+    // Linux / macOS: Create aliases so Windows-style names work here too
+    #define _popen popen
+    #define _pclose pclose
+#endif
+
 const float HOLIDAY_PAY = 1.12f;
 const std::string OPENROUTE_API = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjU2NTIwMzgxMGRiZTQ2NmU5MDg2MTY2OGUwM2I0OWE4IiwiaCI6Im11cm11cjY0In0=";
 
-ApiClient::ApiClient(const std::string& host, const std::string& bearer)
+ApiClient::ApiClient(const std::string& host)
     : cli(host)
 {
-    headers = buildHeaders(bearer);
     cli.set_follow_location(true);
     cli.set_read_timeout(10);
     cli.set_write_timeout(10);
+}
+std::string ApiClient::login(const std::string& username, const std::string& password) {
+    CognitoTokens tokens = authenticate(username, password);
+    return tokens.id_token;
 }
 
 httplib::Headers ApiClient::buildHeaders(const std::string& bearer) const {
@@ -23,10 +34,10 @@ httplib::Headers ApiClient::buildHeaders(const std::string& bearer) const {
     };
 }
 
-float ApiClient::getTotalMoneyEarnt(bool pendingMoney = false) {
-
+float ApiClient::getTotalMoneyEarnt(bool pendingMoney, const std::string& bearerToken){
+    if (bearerToken.empty()) throw std::runtime_error("Not authenticated");
     const std::string basePath = pendingMoney ? "/api/v3/audits?status=assigned" : "/api/v3/audits?limit=200&status=approved,approving_query,submitted,client_query";
-    auto headers = ApiClient::headers;
+    auto headers = buildHeaders(bearerToken);
     auto res = cli.Get(basePath.c_str(), headers);
 
     if (!res) {
@@ -62,7 +73,9 @@ float ApiClient::getTotalMoneyEarnt(bool pendingMoney = false) {
     return totalPay;
 }
 
-std::string ApiClient::getName() {
+std::string ApiClient::getName(const std::string& bearerToken) {
+    if (bearerToken.empty()) throw std::runtime_error("Not authenticated");
+    auto headers = buildHeaders(bearerToken);
     auto res = cli.Get("/api/v1/auditors/me", headers);
     
     if (!res || res->status != 200) {
@@ -75,7 +88,8 @@ std::string ApiClient::getName() {
 }
 
 
-std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = RouteType::NEAREST_NEIGHBOUR) {
+std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = RouteType::NEAREST_NEIGHBOUR, const std::string& bearerToken = "") {
+    if (bearerToken.empty()) throw std::runtime_error("Not authenticated");
     std::vector<std::string> links = { };
     int count{ 0 };
     //for all we can just calculate the distance matrix. using distancematrix.ai we can work it all out from there
@@ -84,7 +98,7 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = Ro
     // i will be using this api https://openrouteservice.org/dev/#/api-docs
 
     const std::string basePath = "/api/v3/audits?status=assigned";
-    auto headers = ApiClient::headers;
+    auto headers = buildHeaders(bearerToken);
     auto res = cli.Get(basePath.c_str(), headers);
 
     if (!res) {
@@ -196,5 +210,42 @@ json ApiClient::getDistanceMatrix(const json& body) const {
         return {};
     }
     return json::parse(res->body);
+}
+
+
+
+std::string ApiClient::runPythonAuth(const std::string& username, const std::string& password) const {
+    std::string cmd = "python Auth.py " + username + " " + password;
+
+    // Open pipe to python script
+    FILE* pipe = _popen(cmd.c_str(), "r");
+    if (!pipe) throw std::runtime_error("Failed to run auth script");
+
+    // Read stdout
+    std::string result;
+    char buffer[256];
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+        result += buffer;
+    }
+
+    int exitCode = _pclose(pipe);
+    if (exitCode != 0) throw std::runtime_error("Auth script failed");
+
+    return result;
+}
+
+CognitoTokens ApiClient::authenticate(const std::string& username, const std::string& password) const {
+    std::string output = runPythonAuth(username, password);
+    json j = json::parse(output);
+
+    if (j.contains("error")) {
+        throw std::runtime_error("Auth error: " + j["error"].get<std::string>());
+    }
+    std::cout << j["access_token"].get<std::string>() << "\n";
+    return CognitoTokens{
+        j["access_token"],
+        j["id_token"],
+        j["refresh_token"]
+    };
 }
 

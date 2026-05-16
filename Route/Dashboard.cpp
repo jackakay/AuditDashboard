@@ -1,55 +1,87 @@
 #include "Dashboard.h"
 #include <iostream>
-#include <thread>
-#include <chrono>
 
-using namespace std;
+Dashboard::Dashboard(ApiClient& client) : apiClient(client) {
+    registerRoutes();
+}
 
-Dashboard::Dashboard(ApiClient& apiClient) : apiClient(apiClient) {}
+void Dashboard::start(int port) {
+    std::cout << "Dashboard running at http://localhost:" << port << "\n";
+    const char* port_env = std::getenv("PORT");
+    int portFromEnv = port_env ? std::stoi(port_env) : port;
+    svr.listen("localhost", portFromEnv);
+}
 
-void Dashboard::start() {
+void Dashboard::registerRoutes() {
+
+    // Serve the frontend
+    svr.Get("/", [this](const httplib::Request&, httplib::Response& res) {
+        res.set_content(loadFile("index.html"), "text/html");
+    });
+
+    //Must be called first
+    svr.Post("/api/login", [this](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        try {
+            auto body = json::parse(req.body);
+            std::string username = body["username"];
+            std::string password = body["password"];
+
+            std::string bearerToken = apiClient.login(username, password);  // authenticate and store tokens
+
+            res.set_content(json{{"success", true}, {"bearer", bearerToken}}.dump(), "application/json");
+        } catch (const std::exception& e) {
+            res.status = 401;
+            res.set_content(json{{"error", e.what()}}.dump(), "application/json");
+        }
+    });
     
-
-    int choice;
-    while (true) {
-        displayMenu();
-        cin >> choice;
-
-        if (choice == 1) {
-            handleViewTotalMoney(false);
+    svr.Get("/api/earnings", [this](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        try {
+            const std::string bearerToken = req.get_header_value("Authorization");
+            bool pending = req.get_param_value("pending") == "true";
+            float total = apiClient.getTotalMoneyEarnt(pending, bearerToken);
+            json j = { {"total", total} };
+            res.set_content(j.dump(), "application/json");
+        } catch (const std::exception& e) {
+            res.status = 500;
+            res.set_content(json{{"error", e.what()}}.dump(), "application/json");
         }
-        else if (choice == 2) {
-            handleViewTotalMoney(true);
-        }else if(choice == 3) {
-            handleGetRoute();
+    });
+
+    svr.Get("/api/name", [this](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        try {
+            const std::string bearerToken = req.get_header_value("Authorization");
+            json j = { {"name", apiClient.getName(bearerToken)} };
+            res.set_content(j.dump(), "application/json");
+        } catch (const std::exception& e) {
+            res.status = 500;
+            res.set_content(json{{"error", e.what()}}.dump(), "application/json");
         }
-        else {
-            exit(0);
+    });
+
+    svr.Get("/api/route", [this](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        try {
+            std::string type = req.get_param_value("type");
+            RouteType route = (type == "brute") ? BRUTE_FORCE : NEAREST_NEIGHBOUR;
+            const std::string bearerToken = req.get_header_value("Authorization");
+            auto links = apiClient.getGoogleMapLinks(route, bearerToken);
+            json j = { {"links", links} };
+            res.set_content(j.dump(), "application/json");
+        } catch (const std::exception& e) {
+            res.status = 500;
+            res.set_content(json{{"error", e.what()}}.dump(), "application/json");
         }
-
-        this_thread::sleep_for(chrono::milliseconds(100));
-        cin.clear();
-    }
+    });
 }
 
-void Dashboard::displayMenu() const {
-    cout << "\nWelcome to the dashboard " << apiClient.getName() << "!\n"
-        << "1. View total money earnt\n"
-        << "2. View total money pending\n"
-        << "3. Get optimal route\n";
+std::string Dashboard::loadFile(const std::string& path) const {
+    std::ifstream file(path);
+    if (!file.is_open()) return "<h1>index.html not found</h1>";
+    std::ostringstream ss;
+    ss << file.rdbuf();
+    return ss.str();
 }
-
-void Dashboard::handleViewTotalMoney(bool isPending) {
-    float totalMoney = apiClient.getTotalMoneyEarnt(isPending);
-    cout << "Total money earnt: " << totalMoney << "\n";
-}
-
-void Dashboard::handleGetRoute() const {
-    
-    auto links = apiClient.getGoogleMapLinks(RouteType::BRUTE_FORCE);
-    cout << "Optimal route Google Maps links:\n";
-    for (const auto& link : links) {
-        cout << link << "\n";
-    }
-}
-

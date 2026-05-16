@@ -3,6 +3,7 @@ FROM alpine:latest AS builder
 
 # Install build essentials: g++, make, and cmake
 RUN apk add --no-cache g++ make cmake
+RUN pip install pycognito
 
 WORKDIR /app
 

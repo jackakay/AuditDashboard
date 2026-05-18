@@ -158,6 +158,131 @@
   .note-btn:hover { border-color: var(--nord8); color: var(--nord8); }
   .note-btn.suggest { border-color: var(--nord15); color: var(--nord15); }
   .note-btn.suggest:hover { background: var(--nord2); }
+
+  @media (max-width: 640px) {
+
+  /* TOPBAR */
+  .topbar { padding: 0 1rem; }
+  .topbar-name { display: none; }
+
+  /* SIDEBAR → horizontal tab bar */
+  .shell { flex-direction: column; }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--nord2);
+    gap: 0;
+    scrollbar-width: none;
+  }
+  .sidebar::-webkit-scrollbar { display: none; }
+
+  .nav-item {
+    flex-shrink: 0;
+    border-left: none;
+    border-bottom: 2px solid transparent;
+    padding: 12px 16px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .nav-item.active {
+    border-left-color: transparent;
+    border-bottom-color: var(--nord8);
+    background: var(--nord2);
+  }
+
+  .nav-section { display: none; }
+
+  /* PAGE CONTENT */
+  .page-content { padding: 1rem; }
+
+  /* STAT GRID */
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+  .stat-value { font-size: 20px; }
+  .stat-card { padding: 1rem; }
+
+  /* TABLE → card layout */
+  .table-wrap { border-radius: var(--radius); }
+
+  thead { display: none; }
+
+  tbody tr {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px;
+    gap: 6px;
+    border-bottom: 1px solid var(--nord2);
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--nord2); }
+
+  tbody td {
+    padding: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+  }
+
+  tbody td::before {
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--nord3);
+    flex-shrink: 0;
+    margin-right: 8px;
+  }
+
+  /* hide the empty th/td for the button column header */
+  tbody td:last-child { justify-content: flex-end; }
+  tbody td:last-child::before { display: none; }
+
+  /* ROUTE CONTROLS */
+  .route-controls { flex-direction: column; align-items: stretch; }
+  .generate-btn { margin-left: 0; width: 100%; }
+  .route-btn { width: 100%; text-align: center; }
+
+  /* ROUTE LINKS */
+  .route-link-item { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .route-link-url { font-size: 11px; }
+
+  /* PAYSLIP ITEMS */
+  .payslip-item { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .payslip-amount { font-size: 16px; }
+
+  /* NOTES */
+  .note-actions { flex-wrap: wrap; }
+  .note-btn { flex: 1; text-align: center; }
+
+  /* MODAL → bottom sheet */
+  .modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 90vh;
+    max-width: 100%;
+  }
+
+  .modal-grid { grid-template-columns: 1fr; }
+  .modal-field.full { grid-column: 1; }
+
+  /* LOGIN */
+  .login-box { padding: 2rem 1.25rem; }
+
+  /* PERIOD TABS */
+  .period-tab { padding: 7px 12px; font-size: 12px; }
+
+}
 </style>
 </head>
 <body>
@@ -414,15 +539,15 @@
         const deadlineStr = deadline.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
         return `
           <tr>
-            <td>
+            <td data-label="Audit">
               <div class="tbl-primary">${a.site_name}</div>
               <div class="tbl-secondary">${a.site_post_code} · ${a.client_name}</div>
             </td>
-            <td>
+            <td data-label="Deadline">
               <span class="deadline-badge ${urgency}">${deadlineStr}</span>
               <span class="days-left ${urgency}">${daysLeft}d left</span>
             </td>
-            <td class="pay-cell">£${Number(a.auditor_pay_per_audit || 0).toFixed(2)}</td>
+            <td data-label="Pay" class="pay-cell">£${Number(a.auditor_pay_per_audit || 0).toFixed(2)}</td>
             <td><button class="info-btn" onclick="showAuditDetail(${i})">Details</button></td>
           </tr>
         `;
@@ -606,10 +731,10 @@ async function loadPayslips() {
               const earningsWithAll = earnings + expenses + (periodMileage * MILEAGE);
               return `
                 <tr>
-                  <td><span class="deadline-badge">${fmt(p.payDate)}</span></td>
-                  <td class="pay-cell">£${earnings.toFixed(2)}</td>
-                  <td class="pay-cell">£${earningsWithAll.toFixed(2)}</td>
-                  <td><span class="tbl-secondary">${fmt(p.periodStart)} – ${fmt(p.periodEnd)}</span></td>
+                  <td data-label="Pay date"><span class="deadline-badge">${fmt(p.payDate)}</span></td>
+                  <td data-label="Earnings" class="pay-cell">£${earnings.toFixed(2)}</td>
+                  <td data-label="+ Expenses" class="pay-cell">£${earningsWithAll.toFixed(2)}</td>
+                  <td data-label="Period"><span class="tbl-secondary">${fmt(p.periodStart)} – ${fmt(p.periodEnd)}</span></td>
                   <td><button class="info-btn" onclick="showPayslipDetail(${i})">Details</button></td>
                 </tr>
               `;

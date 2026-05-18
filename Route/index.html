@@ -383,11 +383,19 @@
     const tbody = document.getElementById('audit-tbody');
     tbody.innerHTML = '<tr><td colspan="4" class="table-empty">Loading…</td></tr>';
     try {
-      const res = await sl('/api/v3/audits?status=assigned');
+      const res = await sl('/api/v3/audits?limit=200&status=assigned');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
+      const numPages = data.pages;
       auditCache = data.items || [];
+
+      for (let i = 2; i <= numPages; i++) {
+        const r = await sl('/api/v3/audits?limit=200&status=assigned&page=' + i);
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        auditCache.push(...(d.items || []));
+      }
       const rawPay = auditCache.reduce((s, a) => s + (a.auditor_pay_per_audit || 0), 0);
 
       document.getElementById('stat-count').textContent   = auditCache.length;
@@ -622,25 +630,57 @@ function showPayslipDetail(i) {
   if (!p) return;
   const fmt = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
+  const earnings    = p.audits.reduce((s, a) => s + (Number(a.auditor_pay_per_audit) || 0), 0);
+  const holidayPay  = p.audits.reduce((s, a) => s + (Number(a.holiday_pay) || 0), 0);
+  const expenses    = p.audits.reduce((s, a) => {
+    const fields = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4'];
+    return s + fields.reduce((s2, k) => s2 + (Number(a[k]) || 0), 0);
+  }, 0);
+  const miles       = p.audits.reduce((s, a) => s + (Number(a.mileage) || 0), 0);
+  const mileagePay  = miles * MILEAGE;
+
   document.getElementById('modal-title').textContent    = fmt(p.periodStart) + ' – ' + fmt(p.periodEnd);
   document.getElementById('modal-subtitle').textContent = 'Pay date: ' + fmt(p.payDate);
 
-  document.getElementById('modal-body').innerHTML = p.audits.map(a => {
-    const expenses = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4']
-      .reduce((s, k) => s + (Number(a[k]) || 0), 0);
-    const mileagePay = (Number(a.mileage) || 0) * MILEAGE;
-    return `
-      <div class="modal-field full">
-        <div class="modal-field-label">${a.site_name} · ${a.internal_id}</div>
-        <div style="display:flex;gap:1rem;margin-top:4px;flex-wrap:wrap">
-          <span class="modal-field-value green">Pay: £${Number(a.total_pay || 0).toFixed(2)}</span>
-          <span class="modal-field-value" style="color:var(--nord9)">Expenses: £${expenses.toFixed(2)}</span>
-          <span class="modal-field-value" style="color:var(--nord9)">Mileage: £${mileagePay.toFixed(2)}</span>
-          <span class="modal-field-value" style="color:var(--nord3);font-size:11px">${fmt(new Date(a.approval_date))}</span>
+  document.getElementById('modal-body').innerHTML = `
+    <div class="modal-field">
+      <div class="modal-field-label">Base pay</div>
+      <div class="modal-field-value mono green">£${earnings.toFixed(2)}</div>
+    </div>
+    <div class="modal-field">
+      <div class="modal-field-label">Inc. holiday pay</div>
+      <div class="modal-field-value mono green">£${(earnings + holidayPay).toFixed(2)}</div>
+    </div>
+    <div class="modal-field">
+      <div class="modal-field-label">Expenses</div>
+      <div class="modal-field-value mono" style="color:var(--nord9)">£${expenses.toFixed(2)}</div>
+    </div>
+    <div class="modal-field">
+      <div class="modal-field-label">Mileage (${miles.toFixed(1)} mi)</div>
+      <div class="modal-field-value mono" style="color:var(--nord9)">£${mileagePay.toFixed(2)}</div>
+    </div>
+
+    <div class="modal-field full" style="background:none;border-color:var(--nord2);border-style:dashed">
+      <div class="modal-field-label">Breakdown</div>
+    </div>
+
+    ${p.audits.map(a => {
+      const exp = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4']
+        .reduce((s, k) => s + (Number(a[k]) || 0), 0);
+      const mi  = (Number(a.mileage) || 0) * MILEAGE;
+      return `
+        <div class="modal-field full">
+          <div class="modal-field-label">${a.site_name} · ${a.internal_id}</div>
+          <div style="display:flex;gap:1rem;margin-top:4px;flex-wrap:wrap">
+            <span class="modal-field-value green">Pay: £${Number(a.total_pay || 0).toFixed(2)}</span>
+            <span class="modal-field-value" style="color:var(--nord9)">Expenses: £${exp.toFixed(2)}</span>
+            <span class="modal-field-value" style="color:var(--nord9)">Mileage: £${mi.toFixed(2)}</span>
+            <span class="modal-field-value" style="color:var(--nord3);font-size:11px">${fmt(new Date(a.approval_date))}</span>
+          </div>
         </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('')}
+  `;
 
   document.getElementById('modal-backdrop').classList.add('open');
 }

@@ -15,6 +15,8 @@ void Dashboard::start(int port) {
 void Dashboard::registerRoutes() {
 
     // Serve the frontend
+    svr.set_mount_point("/static", "./static");
+
     svr.Get("/", [this](const httplib::Request&, httplib::Response& res) {
         res.set_content(loadFile("index.html"), "text/html");
     });

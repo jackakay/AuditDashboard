@@ -14,6 +14,11 @@ enum RouteType {
     BRUTE_FORCE
 };
 
+enum Address{
+    HOME,
+    TERM
+};
+
 struct CognitoTokens {
     std::string access_token;
     std::string id_token;
@@ -39,4 +44,5 @@ private:
     std::string convertRouteToGoogleMapsLink(const std::vector<std::pair<double, double>>& route) const;
     std::string runPythonAuth(const std::string& username, const std::string& password) const;
     bool isAuthenticated() const;
+    std::pair<double, double> getStartingLocation(const std::string& bearerToken, Address addressType);
 };

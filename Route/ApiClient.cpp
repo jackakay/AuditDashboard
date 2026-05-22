@@ -249,3 +249,25 @@ CognitoTokens ApiClient::authenticate(const std::string& username, const std::st
     };
 }
 
+std::pair<double, double> ApiClient::getStartingLocation(const std::string& bearerToken, Address addressType)  {
+    if (bearerToken.empty()) throw std::runtime_error("Not authenticated");
+    
+    httplib::Headers headers = buildHeaders(bearerToken);
+    auto res = cli.Get("/api/v1/auditors/me", headers);
+    
+    if (!res || res->status != 200) {
+        std::cerr << "Failed to get auditor info\n";
+        return {0.0, 0.0};
+    }
+    
+    json j = json::parse(res->body);
+    if(addressType == Address::TERM){
+        double lat = j["term_coordinates"]["lat"].get<double>();
+        double lng = j["term_coordinates"]["lng"].get<double>();
+        return {lng, lat};
+    }
+    double lat = j["home_coordinates"]["lat"].get<double>();
+    double lng = j["home_coordinates"]["lng"].get<double>();
+    return {lng, lat};
+}
+

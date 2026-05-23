@@ -30,7 +30,7 @@ public:
     explicit ApiClient(const std::string& host);
     float getTotalMoneyEarnt(bool pending, const std::string& bearerToken);
     std::string getName(const std::string& bearerToken);
-    std::vector<std::string> getGoogleMapLinks(const RouteType route, const std::string& bearerToken);
+    std::vector<std::string> getGoogleMapLinks(const RouteType route, const std::string& bearerToken, const Address addressType);
     
     CognitoTokens authenticate(const std::string& username, const std::string& password) const;
     std::string login(const std::string& username, const std::string& password);

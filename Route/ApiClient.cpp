@@ -88,7 +88,7 @@ std::string ApiClient::getName(const std::string& bearerToken) {
 }
 
 
-std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = RouteType::NEAREST_NEIGHBOUR, const std::string& bearerToken = "") {
+std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = RouteType::NEAREST_NEIGHBOUR, const std::string& bearerToken = "", const Address addressType = Address::HOME) {
     if (bearerToken.empty()) throw std::runtime_error("Not authenticated");
     std::vector<std::string> links = { };
     int count{ 0 };
@@ -114,7 +114,8 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = Ro
 
     json j = json::parse(res->body);
     std::vector<std::pair<double, double>> coordinatePairs;
-
+    coordinatePairs.push_back(getStartingLocation(bearerToken, addressType)); // add the start location as the first element in the list of coordinates
+    
     for (const auto& audit : j["items"]) {
         auto coords = audit["site_coordinates"];
         coordinatePairs.emplace_back(coords["lng"].get<double>(), coords["lat"].get<double>());
@@ -144,30 +145,83 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = Ro
 }
 
 std::vector<std::pair<double, double>> ApiClient::getBestRouteBruteForce(const json& distanceMatrix) const {
-    double minimumDuration = std::numeric_limits<double>::max();
-    std::vector<std::pair<double, double>> bestRoute = {};
-    std::vector<std::pair<double, double>> tempRoute;
+    const auto& durations = distanceMatrix["durations"];
+    const auto& destinations = distanceMatrix["destinations"];
+    
+    int numLocations = durations.size();
 
-    for(int i = 0; i < distanceMatrix["durations"].size(); ++i){
-        double currentDuration = 0.0;
-        tempRoute.clear(); // clear here instead of inside the if
-        
-        const auto& row = distanceMatrix["durations"][i];
-        for(int j = 0; j < row.size(); ++j){
-            if(row[j].is_null()) continue; // skip null entries
-            currentDuration += row[j].get<double>();
-            
-            // Extract lon/lat from the location array inside destinations
-            double lon = distanceMatrix["destinations"][j]["location"][0].get<double>();
-            double lat = distanceMatrix["destinations"][j]["location"][1].get<double>();
-            tempRoute.emplace_back(lon, lat);
-        }
-        if(currentDuration < minimumDuration){
-            minimumDuration = currentDuration;
-            bestRoute = tempRoute;
-        }
+    // If we have no locations, or just the start point, return empty or just that point
+    if (numLocations == 0) return {};
+    
+    // Helper lambda to get lat/lon pair by matrix index
+    auto getCoords = [&](int index) -> std::pair<double, double> {
+        double lon = destinations[index]["location"][0].get<double>();
+        double lat = destinations[index]["location"][1].get<double>();
+        return {lon, lat};
+    };
+
+    if (numLocations == 1) {
+        return { getCoords(0) };
     }
-    return bestRoute;
+
+    
+    // Index 0 is strictly reserved as the start and end
+    std::vector<int> middleStops(numLocations - 1);
+    std::iota(middleStops.begin(), middleStops.end(), 1); // Fills with 1, 2, ..., n-1
+
+    double minimumDuration = std::numeric_limits<double>::max();
+    std::vector<int> bestPathIndices;
+
+    //Brute-force through all possible middle stop permutations
+    // std::next_permutation requires the range to be sorted initially (which std::iota handles)
+    do {
+        double currentDuration = 0.0;
+        bool validPath = true;
+
+        // A. Cost from Start (0) to the first middle stop
+        auto firstLeg = durations[0][middleStops[0]];
+        if (firstLeg.is_null()) continue;
+        currentDuration += firstLeg.get<double>();
+
+        // B. Cost between all intermediate middle stops
+        for (size_t i = 0; i < middleStops.size() - 1; ++i) {
+            auto leg = durations[middleStops[i]][middleStops[i + 1]];
+            if (leg.is_null()) {
+                validPath = false;
+                break;
+            }
+            currentDuration += leg.get<double>();
+        }
+        if (!validPath) continue;
+
+        // C. Cost from the last middle stop back to Start (0)
+        auto lastLeg = durations[middleStops.back()][0];
+        if (lastLeg.is_null()) continue;
+        currentDuration += lastLeg.get<double>();
+
+        // Check if this permutation is the absolute fastest round trip
+        if (currentDuration < minimumDuration) {
+            minimumDuration = currentDuration;
+            bestPathIndices = middleStops;
+        }
+
+    } while (std::next_permutation(middleStops.begin(), middleStops.end()));
+
+    // 3. Reconstruct the final route coordinates using the winning indices
+    std::vector<std::pair<double, double>> bestRouteCoords;
+    
+    // Add Start Location
+    bestRouteCoords.push_back(getCoords(0));
+    
+    // Add winning middle stops in their optimal order
+    for (int idx : bestPathIndices) {
+        bestRouteCoords.push_back(getCoords(idx));
+    }
+    
+    // Add End Location (same as Start)
+    bestRouteCoords.push_back(getCoords(0));
+
+    return bestRouteCoords;
 }
 
 std::string ApiClient::convertRouteToGoogleMapsLink(const std::vector<std::pair<double, double>>& route) const {

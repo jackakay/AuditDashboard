@@ -69,8 +69,11 @@ void Dashboard::registerRoutes() {
         try {
             std::string type = req.get_param_value("type");
             RouteType route = (type == "brute") ? BRUTE_FORCE : NEAREST_NEIGHBOUR;
+
             const std::string bearerToken = req.get_header_value("Authorization");
-            auto links = apiClient.getGoogleMapLinks(route, bearerToken);
+
+            Address addressType = (req.get_param_value("address") == "home") ? HOME : TERM;
+            auto links = apiClient.getGoogleMapLinks(route, bearerToken, addressType);
             json j = { {"links", links} };
             res.set_content(j.dump(), "application/json");
         } catch (const std::exception& e) {

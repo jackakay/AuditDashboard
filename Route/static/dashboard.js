@@ -1,4 +1,4 @@
-let selectedRoute = 'nearest';
+let selectedRoute = 'brute';
 let auditCache = [];
 let payslipData = null;
 let responseSearchRows = [];
@@ -123,7 +123,7 @@ function navigate(page) {
               <span class="deadline-badge ${urgency}">${deadlineStr}</span>
               <span class="days-left ${urgency}">${daysLeft}d left</span>
             </td>
-            <td data-label="Pay" class="pay-cell">\u00a3${Number(a.auditor_pay_per_audit || 0).toFixed(2)}</td>
+            <td data-label="Pay" class="pay-cell">\u00a3${Number(a.auditor_pay_per_audit * HOLIDAY_RATE || 0).toFixed(2)}</td>
             <td><button class="info-btn" onclick="showAuditDetail(${i})">Details</button></td>
           </tr>
         `;
@@ -385,9 +385,9 @@ function showPayslipDetail(i) {
     container.innerHTML = '<div class="route-empty">Calculating...</div>';
     try {
       // route stays on local C++ server - this is where the algorithm lives
-      const res = await local('/api/route?type=' + selectedRoute, {
-        headers: { 'Authorization': sessionStorage.getItem('bearer') || '' }
-      });
+      const res = await local(`/api/route?type=${selectedRoute}&home=${homeValue}`, {
+      headers: { 'Authorization': sessionStorage.getItem('bearer') || '' }
+    });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Failed');
       const links = data.links || [];

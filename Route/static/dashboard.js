@@ -1,5 +1,6 @@
 let selectedRoute = 'brute';
 let auditCache = [];
+let completedCache = [];
 let payslipData = null;
 let responseSearchRows = [];
 let responseById = new Map();
@@ -20,7 +21,7 @@ async function getApprovedAuditData() {
     if (d.error) throw new Error(d.error);
     items.push(...(d.items || []));
   }
-
+  completedCache = items;
   payslipData = items;
   buildResponseIndexes(items);
 
@@ -593,7 +594,7 @@ function showPayslipDetail(i) {
                   <td data-label="Audit ID" class="pay-cell">${a.internal_id || a.order_internal_id || ''}</td>
                   <td data-label="Submission date">${submitted ? fmt(submitted) : '-'}</td>
                   <td data-label="Status">${a.status || ''}</td>
-                  <td><button class="info-btn" onclick="showAuditDetailFromResponse('${a.internal_id}')">View</button></td>
+                  <td><button class="info-btn" onclick="showAuditDetailFromResponse('${a.internal_id || a.order_internal_id}')">View</button></td>
                 </tr>
               `;
             }).join('')}
@@ -602,7 +603,16 @@ function showPayslipDetail(i) {
       </div>
     `;
   }
-  function showAuditDetailFromResponse(auditId) {
+  function showAuditDetailFromResponse(auditID) {
     //We need to get the index of the audit in the main cache to reuse the existing detail modal
-    const index = auditCache.findIndex(a => String(a.internal_id) === String(auditId));
+    const auditObj = completedCache.find(a => 
+      String(a.internal_id) === String(auditID) || 
+      String(a.order_internal_id) === String(auditID)
+    );
+    console.log(completedCache.length);
+    if (!auditObj) {
+      alert('Audit not found in cache.');
+      return;
+    }
+    console.log(JSON.stringify(auditObj));
   }

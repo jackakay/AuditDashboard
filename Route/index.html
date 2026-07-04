@@ -114,9 +114,30 @@
         <p class="page-sub">Optimise your audit visits</p>
         <div class="route-card">
           <div class="route-controls">
-            <button class="route-btn active" id="btn-nn" onclick="selectRoute('nearest')">Nearest neighbour</button>
-            <button class="route-btn" id="btn-bf" onclick="selectRoute('brute')">Brute force</button>
-            <button class="generate-btn" id="fetch-btn" onclick="fetchRoute()">Generate route</button>
+
+            <div class="cd" id="cd-route">
+              <div class="cd-trigger" id="cd-route-trigger">
+                <span id="cd-route-label">Brute force</span>
+                <span class="cd-arrow">▼</span>
+              </div>
+              <div class="cd-list" id="cd-route-list">
+                <div class="cd-option selected" data-value="brute">Brute force</div>
+                <div class="cd-option" data-value="nearest">Nearest neighbour</div>
+              </div>
+            </div>
+
+            <div class="cd" id="cd-addr">
+              <div class="cd-trigger" id="cd-addr-trigger">
+                <span id="cd-addr-label">Home Address</span>
+                <span class="cd-arrow">▼</span>
+              </div>
+              <div class="cd-list" id="cd-addr-list">
+                <div class="cd-option selected" data-value="home">Home Address</div>
+                <div class="cd-option" data-value="term">Term Address</div>
+              </div>
+            </div>
+
+            <button class="info-btn" id="fetch-btn" style="margin-left: auto; font-size: 13px; padding: 6px 16px;" onclick="fetchRoute()">Generate route</button>
           </div>
           <div class="route-links" id="route-links">
             <div class="route-empty">Select a method and generate a route.</div>

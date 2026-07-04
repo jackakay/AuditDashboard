@@ -266,6 +266,10 @@ function navigate(page) {
           <div class="stat-label">Total + expenses</div>
           <div class="stat-value stat-accent">\u00a3${totalWithExpenses.toFixed(2)}</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-label">Total mileage</div>
+          <div class="stat-value stat-accent">${mileage.toFixed(2)}</div>
+        </div>
       </div>
 
       <div class="table-wrap" style="margin-top:1.5rem">
@@ -384,9 +388,11 @@ function showPayslipDetail(i) {
     btn.textContent = 'Generating...';
     errEl.textContent = '';
     container.innerHTML = '<div class="route-empty">Calculating...</div>';
+    homeValue = dropdownState.address;
+    selectedRoute = dropdownState.route;
     try {
       // route stays on local C++ server - this is where the algorithm lives
-      const res = await local(`/api/route?type=${selectedRoute}&home=${homeValue}`, {
+      const res = await local(`/api/route?type=${selectedRoute}&address=${homeValue}`, {
       headers: { 'Authorization': sessionStorage.getItem('bearer') || '' }
     });
       const data = await res.json();
@@ -407,6 +413,8 @@ function showPayslipDetail(i) {
       btn.textContent = 'Generate route';
     }
   }
+
+  
 
   function loadNotes() {
     //functionality for the notes here
@@ -506,41 +514,16 @@ function showPayslipDetail(i) {
 
     renderResponseResults(rows);
   }
-  function applyResponseFilters() {
-    const query = document.getElementById('response-search').value.trim().toLowerCase();
-    const fromValue = document.getElementById('response-from').value;
-    const toValue = document.getElementById('response-to').value;
-
-    const from = fromValue ? new Date(fromValue + 'T00:00:00') : null;
-    const to = toValue ? new Date(toValue + 'T23:59:59') : null;
-
-    let rows = responseSearchRows;
-
-    if (query) {
-      const exact = responseById.get(query);
-      rows = exact
-        ? [{ audit: exact, searchText: '', submissionDate: getAuditSubmissionDate(exact) }]
-        : rows.filter(row => row.searchText.includes(query));
-    }
-
-    rows = rows.filter(row => {
-      if (!row.submissionDate) return !from && !to;
-
-      const date = new Date(row.submissionDate);
-      if (from && date < from) return false;
-      if (to && date > to) return false;
-      return true;
-    });
-
-    renderResponseResults(rows);
-  }
+  
   function renderViewResponses() {
     const container = document.getElementById('view-responses-container');
 
     container.innerHTML = `
       <div class="response-toolbar">
         <input id="response-search" class="response-input" placeholder="Search name or audit ID" />
+        <span class="field-label">From</span>
         <input id="response-from" class="response-input" type="date" />
+        <span class="field-label">To</span>
         <input id="response-to" class="response-input" type="date" />
         <button class="info-btn" onclick="clearResponseFilters()">Clear</button>
       </div>
@@ -616,3 +599,46 @@ function showPayslipDetail(i) {
     }
     console.log(JSON.stringify(auditObj));
   }
+
+  //dropdown functionality 
+
+
+const dropdownState = { route: 'brute', address: 'home' };
+
+function makeDropdown(triggerId, listId, labelId, stateKey) {
+  const trigger = document.getElementById(triggerId);
+  const list = document.getElementById(listId);
+  const label = document.getElementById(labelId);
+  const options = list.querySelectorAll('.cd-option');
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = list.classList.contains('open');
+    document.querySelectorAll('.cd-list').forEach(l => l.classList.remove('open'));
+    document.querySelectorAll('.cd-trigger').forEach(t => t.classList.remove('open'));
+    if (!isOpen) {
+      list.classList.add('open');
+      trigger.classList.add('open');
+    }
+  });
+
+  options.forEach(opt => {
+    opt.addEventListener('click', () => {
+      options.forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      label.textContent = opt.textContent;
+      dropdownState[stateKey] = opt.dataset.value;
+      list.classList.remove('open');
+      trigger.classList.remove('open');
+    });
+  });
+}
+//make sure its loaded after the DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  makeDropdown('cd-route-trigger', 'cd-route-list', 'cd-route-label', 'route');
+  makeDropdown('cd-addr-trigger', 'cd-addr-list', 'cd-addr-label', 'address');
+});
+document.addEventListener('click', () => {
+  document.querySelectorAll('.cd-list').forEach(l => l.classList.remove('open'));
+  document.querySelectorAll('.cd-trigger').forEach(t => t.classList.remove('open'));
+});

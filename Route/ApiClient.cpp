@@ -115,7 +115,7 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = Ro
     json j = json::parse(res->body);
     std::vector<std::pair<double, double>> coordinatePairs;
     coordinatePairs.push_back(getStartingLocation(bearerToken, addressType)); // add the start location as the first element in the list of coordinates
-    
+    std::cout << "Audit locations succesfully found.\n";
     for (const auto& audit : j["items"]) {
         auto coords = audit["site_coordinates"];
         coordinatePairs.emplace_back(coords["lng"].get<double>(), coords["lat"].get<double>());
@@ -238,12 +238,9 @@ json ApiClient::convertCoordinatesToJson(const std::vector<std::pair<double, dou
 
 // Filter coordinates to only include those within the specified bounding box
 //Remember to change this back count is only < 6 to test brute force
-    int count = 0;
+    
     for (const auto& [lng, lat] : coordinates) {
-        if (lat >= 52.0 && lat <= 53.0 && lng >= -2.0 && lng <= -1.0 && count < 6) {
-            body["locations"].push_back({lng, lat});
-            count++;
-        }
+        body["locations"].push_back({lng, lat}); 
     }
     return body;
 }
@@ -258,7 +255,8 @@ json ApiClient::getDistanceMatrix(const json& body) const {
     };
     
     auto res = cli.Post("/v2/matrix/driving-car", headers, body.dump(), "application/json");
-
+    std::cout << body.dump() << std::endl;
+    std::cout << res << std::endl;
     if (!res || res->status != 200) {
         std::cerr << "Failed to get distance matrix\n";
         return {};
@@ -318,10 +316,12 @@ std::pair<double, double> ApiClient::getStartingLocation(const std::string& bear
     if(addressType == Address::TERM){
         double lat = j["term_coordinates"]["lat"].get<double>();
         double lng = j["term_coordinates"]["lng"].get<double>();
+        std::cout << "Term coordinates: " << lat << ", " << lng << "\n";
         return {lng, lat};
     }
     double lat = j["home_coordinates"]["lat"].get<double>();
     double lng = j["home_coordinates"]["lng"].get<double>();
+    std::cout << "Home coordinates: " << lat << ", " << lng << "\n";
     return {lng, lat};
 }
 

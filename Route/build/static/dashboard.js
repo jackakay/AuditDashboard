@@ -35,6 +35,7 @@ function navigate(page) {
     if (page === 'payslips') loadPayslips();
     if (page === 'notes') loadNotes();
     if (page === 'view-responses') loadViewResponses();
+    if(page === 'routes') loadRoutes();
   }
 
   async function doLogin() {
@@ -390,11 +391,21 @@ function showPayslipDetail(i) {
     container.innerHTML = '<div class="route-empty">Calculating...</div>';
     homeValue = dropdownState.address;
     selectedRoute = dropdownState.route;
+    var selectedStops = getSelectedStops();
+
+    let requestBody = JSON.stringify(selectedStops);
+    console.log(requestBody);
     try {
       // route stays on local C++ server - this is where the algorithm lives
-      const res = await local(`/api/route?type=${selectedRoute}&address=${homeValue}`, {
-      headers: { 'Authorization': sessionStorage.getItem('bearer') || '' }
+      const res = await fetch(`/api/route?type=${selectedRoute}&address=${homeValue}`, {
+        method: 'POST',                                   
+        headers: { 
+            'Authorization': sessionStorage.getItem('bearer') || '',
+            'Content-Type': 'application/json'             
+        },
+        body: requestBody                                 
     });
+    
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Failed');
       const links = data.links || [];
@@ -642,3 +653,96 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.cd-list').forEach(l => l.classList.remove('open'));
   document.querySelectorAll('.cd-trigger').forEach(t => t.classList.remove('open'));
 });
+
+
+
+const tbody = document.querySelector('#route-stops-table tbody');
+const selectAllCheckbox = document.getElementById('select-all-checkbox');
+function loadRoutes(){
+  //load all audit data from "auditCache" and fill out the table.
+  renderRouteStopsTable();
+}
+function renderRouteStopsTable() {
+    const tbody = document.querySelector('#route-stops-table tbody');
+    if (!tbody) return;
+
+    if (!auditCache || auditCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No audits available.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = auditCache.map((a, index) => {
+        const deadline = new Date(a.deadline_date);
+        const deadlineStr = deadline.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        
+        return `
+            <tr>
+                <td style="text-align: center;" data-label="Select">
+                    <input type="checkbox" class="row-checkbox" data-index="${index}" style="accent-color: var(--nord10); cursor: pointer;">
+                </td>
+                <td data-label="Audit name">
+                    <div class="tbl-primary">${a.site_name || ''}</div>
+                    <div class="tbl-secondary">${a.client_name || ''}</div>
+                </td>
+                <td data-label="Audit ID" class="pay-cell">${a.internal_id || a.order_internal_id || ''}</td>
+                <td data-label="Deadline"><span class="deadline-badge">${deadlineStr}</span></td>
+                <td data-label="Action" style="text-align: right;">
+                    <button class="info-btn" onclick="showAuditDetail(${index})">Details</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    tbody.addEventListener('change', function(e) {
+    if (e.target.classList.contains('row-checkbox')) {
+        const row = e.target.closest('tr');
+        if (e.target.checked) {
+            row.style.background = 'var(--nord2)'; // Matches your hover/active highlight styling
+        } else {
+            row.style.background = '';
+        }
+        updateSelectAllState();
+    }
+    });
+
+    // 3. Handle Master "Select All" Checkbox
+    selectAllCheckbox.addEventListener('change', function() {
+        const isChecked = selectAllCheckbox.checked;
+        const rowCheckboxes = tbody.querySelectorAll('.row-checkbox');
+
+        rowCheckboxes.forEach(checkbox => {
+            checkbox.checked = isChecked;
+            const row = checkbox.closest('tr');
+            row.style.background = isChecked ? 'var(--nord2)' : '';
+        });
+    });
+}
+function getSelectedStops(){
+  const checkedBoxes = tbody.querySelectorAll('.row-checkbox:checked');
+    return Array.from(checkedBoxes).map(cb => {
+        const index = cb.getAttribute('data-index');
+        return auditCache[index];
+    });
+}
+function updateSelectAllState() {
+    const rowCheckboxes = tbody.querySelectorAll('.row-checkbox');
+    if (rowCheckboxes.length === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+        return;
+    }
+
+    const allChecked = Array.from(rowCheckboxes).every(cb => cb.checked);
+    const someChecked = Array.from(rowCheckboxes).some(cb => cb.checked);
+
+    if (allChecked) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else if (someChecked) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true; // Displays the professional dash state
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    }
+}

@@ -88,7 +88,7 @@ std::string ApiClient::getName(const std::string& bearerToken) {
 }
 
 
-std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = RouteType::NEAREST_NEIGHBOUR, const std::string& bearerToken = "", const Address addressType = Address::HOME) {
+std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route, const std::string& bearerToken, const json& j, const Address addressType) {
     if (bearerToken.empty()) throw std::runtime_error("Not authenticated");
     std::vector<std::string> links = { };
     int count{ 0 };
@@ -97,26 +97,12 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = Ro
 
     // i will be using this api https://openrouteservice.org/dev/#/api-docs
 
-    const std::string basePath = "/api/v3/audits?status=assigned";
-    auto headers = buildHeaders(bearerToken);
-    auto res = cli.Get(basePath.c_str(), headers);
 
-    if (!res) {
-        std::cerr << "Request failed (network/SSL error)\n";
-        return {};
-    }
-
-    if (res->status != 200) {
-        std::cerr << "HTTP error: " << res->status << "\n";
-        std::cerr << res->body << "\n";
-        return {};
-    }
-
-    json j = json::parse(res->body);
+    
     std::vector<std::pair<double, double>> coordinatePairs;
     coordinatePairs.push_back(getStartingLocation(bearerToken, addressType)); // add the start location as the first element in the list of coordinates
     std::cout << "Audit locations succesfully found.\n";
-    for (const auto& audit : j["items"]) {
+    for (const auto& audit : j) {
         auto coords = audit["site_coordinates"];
         coordinatePairs.emplace_back(coords["lng"].get<double>(), coords["lat"].get<double>());
     } // now we have all pairs of coordinates left over

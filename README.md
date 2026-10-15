@@ -29,7 +29,9 @@ docker build -t audit-dashboard-server .
 
 # Run the container
 docker run -p 8080:8080 audit-dashboard-server
+<<<<<<< HEAD
 
 ## Ideas
 Select which audits to route
 text document storing the order in which to complete them.
+

@@ -18,7 +18,7 @@ void Dashboard::registerRoutes() {
     svr.set_mount_point("/static", "./static");
 
     svr.Get("/", [this](const httplib::Request&, httplib::Response& res) {
-        res.set_content(loadFile("index.html"), "text/html");
+        res.set_content(loadFile("static/index.html"), "text/html");
     });
 
     //Must be called first
@@ -68,8 +68,10 @@ void Dashboard::registerRoutes() {
         res.set_header("Access-Control-Allow-Origin", "*");
         try {
             std::string type = req.get_param_value("type");
-            RouteType route = (type == "brute") ? BRUTE_FORCE : NEAREST_NEIGHBOUR;
-
+            RouteType route;
+            if(type == "brute") route = RouteType::BRUTE_FORCE;
+            else if(type=="heldkarp") route = RouteType::HELD_KARP;
+            else route = RouteType::NEAREST_NEIGHBOUR;
             const std::string bearerToken = req.get_header_value("Authorization");
 
             Address addressType = (req.get_param_value("address") == "home") ? HOME : TERM;

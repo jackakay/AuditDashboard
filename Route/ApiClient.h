@@ -5,13 +5,16 @@
 #include <vector>
 #include <stdexcept>
 #include <cstdio>
+#include "DistanceMatrix.h"
+#include "HeldKarp.h"
 
 
 using json = nlohmann::json;
 
 enum RouteType {
     NEAREST_NEIGHBOUR,
-    BRUTE_FORCE
+    BRUTE_FORCE,
+    HELD_KARP
 };
 
 enum Address{
@@ -40,9 +43,13 @@ private:
     httplib::Headers buildHeaders(const std::string& bearer) const;
     json convertCoordinatesToJson(const std::vector<std::pair<double, double>>& coordinates) const;
     json getDistanceMatrix(const json& body) const;
-    std::vector<std::pair<double, double>> getBestRouteBruteForce(const json& distanceMatrix) const;
+    
+    std::vector<std::pair<double, double>> getBestRouteBruteForce(DistanceMatrix m) const;
+
     std::string convertRouteToGoogleMapsLink(const std::vector<std::pair<double, double>>& route) const;
     std::string runPythonAuth(const std::string& username, const std::string& password) const;
     bool isAuthenticated() const;
     std::pair<double, double> getStartingLocation(const std::string& bearerToken, Address addressType);
+    DistanceMatrix getMatrix(const json& body) const;
+    
 };

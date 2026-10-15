@@ -124,80 +124,73 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route = Ro
     //send distance matrix request to api, get back the distance matrix, and then we can work out the routes from there.
 
     json distanceMatrix = getDistanceMatrix(convertCoordinatesToJson(coordinatePairs));
+    DistanceMatrix mat = DistanceMatrix(distanceMatrix);
 
     switch (route) {
         case RouteType::NEAREST_NEIGHBOUR:
             // ...
             break;
-        case RouteType::BRUTE_FORCE:
+        case RouteType::BRUTE_FORCE: {
             // ...
             //we compute the distance between each element, find the total time for all nodes, and repeat
             // and keep finding the minimum between the current minimum, and the one we just worked out, until all permutations are complete.
             //only really works < 10.
 
             //We need to add a constant start/end point
-            std::vector<std::pair<double, double>> bestRoute = getBestRouteBruteForce(distanceMatrix);
+            std::vector<std::pair<double, double>> bestRoute = getBestRouteBruteForce(mat);
             links.push_back(convertRouteToGoogleMapsLink(bestRoute));
             break;
+        }
+        case RouteType::HELD_KARP: {
+            std::vector<std::pair<double, double>> bestRoute = HeldKarp::solve(mat);
+            links.push_back(convertRouteToGoogleMapsLink(bestRoute));
+            break;
+        }
+        default:
+            break;
+
     }
 
     return links;
 }
 
-std::vector<std::pair<double, double>> ApiClient::getBestRouteBruteForce(const json& distanceMatrix) const {
-    const auto& durations = distanceMatrix["durations"];
-    const auto& destinations = distanceMatrix["destinations"];
-    
-    int numLocations = durations.size();
-
-    // If we have no locations, or just the start point, return empty or just that point
-    if (numLocations == 0) return {};
-    
-    // Helper lambda to get lat/lon pair by matrix index
-    auto getCoords = [&](int index) -> std::pair<double, double> {
-        double lon = destinations[index]["location"][0].get<double>();
-        double lat = destinations[index]["location"][1].get<double>();
-        return {lon, lat};
-    };
-
-    if (numLocations == 1) {
-        return { getCoords(0) };
-    }
-
-    
+std::vector<std::pair<double, double>> ApiClient::getBestRouteBruteForce(DistanceMatrix m) const {
     // Index 0 is strictly reserved as the start and end
+    int numLocations = m.size();
+    if (numLocations <= 1) return {};
+
     std::vector<int> middleStops(numLocations - 1);
     std::iota(middleStops.begin(), middleStops.end(), 1); // Fills with 1, 2, ..., n-1
 
     double minimumDuration = std::numeric_limits<double>::max();
     std::vector<int> bestPathIndices;
+    const double INF = std::numeric_limits<double>::infinity();
 
-    //Brute-force through all possible middle stop permutations
-    // std::next_permutation requires the range to be sorted initially (which std::iota handles)
+    // Brute-force through all possible middle stop permutations
     do {
         double currentDuration = 0.0;
         bool validPath = true;
 
         // A. Cost from Start (0) to the first middle stop
-        auto firstLeg = durations[0][middleStops[0]];
-        if (firstLeg.is_null()) continue;
-        currentDuration += firstLeg.get<double>();
+        double firstLeg = m.getTime(0, middleStops[0]);
+        if (firstLeg == INF) continue;
+        currentDuration += firstLeg;
 
         // B. Cost between all intermediate middle stops
         for (size_t i = 0; i < middleStops.size() - 1; ++i) {
-            auto leg = durations[middleStops[i]][middleStops[i + 1]];
-            if (leg.is_null()) {
+            double leg = m.getTime(middleStops[i], middleStops[i + 1]);
+            if (leg == INF) {
                 validPath = false;
                 break;
             }
-            currentDuration += leg.get<double>();
+            currentDuration += leg;
         }
         if (!validPath) continue;
 
         // C. Cost from the last middle stop back to Start (0)
-        auto lastLeg = durations[middleStops.back()][0];
-        if (lastLeg.is_null()) continue;
-        currentDuration += lastLeg.get<double>();
+        double lastLeg = m.getTime(middleStops.back(), 0);
+        if (lastLeg == INF) continue;
+        currentDuration += lastLeg;
 
         // Check if this permutation is the absolute fastest round trip
         if (currentDuration < minimumDuration) {
@@ -207,19 +200,22 @@ std::vector<std::pair<double, double>> ApiClient::getBestRouteBruteForce(const j
 
     } while (std::next_permutation(middleStops.begin(), middleStops.end()));
 
-    // 3. Reconstruct the final route coordinates using the winning indices
+    // If no valid loop could be completed
+    if (minimumDuration == INF) return {};
+
+    // 3. Reconstruct the final route coordinates using m's methods
     std::vector<std::pair<double, double>> bestRouteCoords;
-    
+
     // Add Start Location
-    bestRouteCoords.push_back(getCoords(0));
-    
+    bestRouteCoords.push_back(m.getCoords(0));
+
     // Add winning middle stops in their optimal order
     for (int idx : bestPathIndices) {
-        bestRouteCoords.push_back(getCoords(idx));
+        bestRouteCoords.push_back(m.getCoords(idx));
     }
-    
+
     // Add End Location (same as Start)
-    bestRouteCoords.push_back(getCoords(0));
+    bestRouteCoords.push_back(m.getCoords(0));
 
     return bestRouteCoords;
 }
@@ -236,9 +232,6 @@ json ApiClient::convertCoordinatesToJson(const std::vector<std::pair<double, dou
     json body;
     body["locations"] = json::array();
 
-// Filter coordinates to only include those within the specified bounding box
-//Remember to change this back count is only < 6 to test brute force
-    
     for (const auto& [lng, lat] : coordinates) {
         body["locations"].push_back({lng, lat}); 
     }
@@ -264,7 +257,9 @@ json ApiClient::getDistanceMatrix(const json& body) const {
     return json::parse(res->body);
 }
 
-
+DistanceMatrix getMatrix(const json& body){
+    return DistanceMatrix(body);
+}
 
 std::string ApiClient::runPythonAuth(const std::string& username, const std::string& password) const {
     std::string cmd = "python3 ./Auth.py " + username + " " + password;

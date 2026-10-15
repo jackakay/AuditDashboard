@@ -64,10 +64,14 @@ void Dashboard::registerRoutes() {
         }
     });
 
-    svr.Get("/api/route", [this](const httplib::Request& req, httplib::Response& res) {
+    svr.Post("/api/route", [this](const httplib::Request& req, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         try {
             std::string type = req.get_param_value("type");
+            std::cout << req.body;
+
+            json data = json::parse(req.body);
+            std::cout << data;
             RouteType route;
             if(type == "brute") route = RouteType::BRUTE_FORCE;
             else if(type=="heldkarp") route = RouteType::HELD_KARP;
@@ -75,7 +79,7 @@ void Dashboard::registerRoutes() {
             const std::string bearerToken = req.get_header_value("Authorization");
 
             Address addressType = (req.get_param_value("address") == "home") ? HOME : TERM;
-            auto links = apiClient.getGoogleMapLinks(route, bearerToken, addressType);
+            auto links = apiClient.getGoogleMapLinks(route, bearerToken, data,  addressType);
             json j = { {"links", links} };
             res.set_content(j.dump(), "application/json");
         } catch (const std::exception& e) {

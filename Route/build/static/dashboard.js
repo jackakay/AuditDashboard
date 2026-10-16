@@ -409,6 +409,7 @@ function showPayslipDetail(i) {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Failed');
       const links = data.links || [];
+      const report = data.report;
       if (links.length === 0) { container.innerHTML = '<div class="route-empty">No routes returned.</div>'; return; }
       container.innerHTML = links.map((url, i) => `
         <div class="route-link-item">
@@ -424,7 +425,7 @@ function showPayslipDetail(i) {
       btn.textContent = 'Generate route';
     }
 
-    downloadSelectedStopsAsText();
+    downloadSelectedStopsAsText(report);
   }
 
   
@@ -749,7 +750,7 @@ function updateSelectAllState() {
     }
 }
 
-function downloadSelectedStopsAsText() {
+function downloadSelectedStopsAsText(fileContent) {
     // 1. Gather the selected stops from your table
     const checkedBoxes = document.querySelectorAll('#route-stops-table .row-checkbox:checked');
     const selectedStops = Array.from(checkedBoxes).map(cb => {
@@ -762,22 +763,7 @@ function downloadSelectedStopsAsText() {
         return;
     }
 
-    // 2. Populate the text content dynamically
-    let fileContent = "========================================\r\n";
-    fileContent +=     "           SELECTED AUDIT ROUTE         \r\n";
-    fileContent +=     "========================================\r\n\r\n";
-
-    selectedStops.forEach((audit, index) => {
-        fileContent += `Stop #${index + 1}\r\n`;
-        fileContent += `----------------------------------------\r\n`;
-        fileContent += `Site Name:     ${audit.site_name || 'N/A'}\r\n`;
-        fileContent += `Post Code:     ${audit.site_post_code || 'N/A'}\r\n`;
-        fileContent += `Client:        ${audit.client_name || 'N/A'}\r\n`;
-        fileContent += `Internal ID:   ${audit.internal_id || audit.order_internal_id || 'N/A'}\r\n`;
-        fileContent += `Deadline:      ${audit.deadline_date ? new Date(audit.deadline_date).toLocaleDateString('en-GB') : 'N/A'}\r\n`;
-        fileContent += `Pay (Inc. Hol): £${Number(audit.auditor_pay_per_audit * HOLIDAY_RATE || 0).toFixed(2)}\r\n\r\n`;
-    });
-
+   
     // 3. Create a Blob and trigger the download
     const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);

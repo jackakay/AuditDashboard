@@ -7,6 +7,7 @@
 #include <cstdio>
 #include "DistanceMatrix.h"
 #include "HeldKarp.h"
+#include "Audit.h"
 
 
 using json = nlohmann::json;
@@ -41,7 +42,7 @@ public:
 private:
     httplib::Client cli;
     httplib::Headers buildHeaders(const std::string& bearer) const;
-    json convertCoordinatesToJson(const std::vector<std::pair<double, double>>& coordinates) const;
+    json convertCoordinatesToJson(const std::vector<Audit> audits) const;
     json getDistanceMatrix(const json& body) const;
     
     std::vector<std::pair<double, double>> getBestRouteBruteForce(DistanceMatrix m) const;

@@ -15,4 +15,6 @@ private:
     httplib::Server svr;
     void registerRoutes();
     std::string loadFile(const std::string& path) const;
+    std::string convertRouteToGoogleMapsLink(const std::vector<Audit>& route) const;
+    std::string generateAuditRouteReport(const std::vector<Audit>& audits); 
 };

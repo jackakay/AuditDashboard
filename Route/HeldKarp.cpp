@@ -2,7 +2,7 @@
 
 
 // Takes a DistanceMatrix object, and outputs the fastest route.
-std::vector<std::pair<double, double>> HeldKarp::solve(DistanceMatrix m){ // guarantees optimality
+std::vector<Audit> HeldKarp::solve(DistanceMatrix m, std::vector<Audit> audits){ // guarantees optimality
     int n = m.size();
     if (n <= 1) return {};
     
@@ -12,7 +12,7 @@ std::vector<std::pair<double, double>> HeldKarp::solve(DistanceMatrix m){ // gua
         double t1 = m.getTime(0, 1);
         double t2 = m.getTime(1, 0);
         if (t1 == INF || t2 == INF) return {};
-        return {m.getCoords(0), m.getCoords(1), m.getCoords(0)};
+        return {audits[0], audits[1], audits[0]};
     }
 
     int num_states = 1 << n; // 2^n subsets
@@ -85,12 +85,15 @@ std::vector<std::pair<double, double>> HeldKarp::solve(DistanceMatrix m){ // gua
 
     // Map the winning indices back to coordinates using m
     std::vector<std::pair<double, double>> bestRouteCoords;
+    std::vector<Audit> bestRoute;
     
     for (int idx : bestPathIndices) {
         bestRouteCoords.push_back(m.getCoords(idx));
+        bestRoute.push_back(audits[idx]);
     }
     // Complete the loop back to start
     bestRouteCoords.push_back(m.getCoords(0));
+    bestRoute.push_back(audits[0]);
 
-    return bestRouteCoords;
+    return bestRoute;
 }

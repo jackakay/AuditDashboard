@@ -11,7 +11,7 @@ struct Audit {
     std::string internal_id;
     std::string deadline_date;
     double auditor_pay_per_audit = 0.0;
-    double pay_inc_hol = 0.0;
+    //double pay_inc_hol = 0.0;
     std::pair<double, double> coords = {0.0, 0.0}; // Stores {lng, lat}
 };
 
@@ -23,7 +23,7 @@ inline void from_json(const nlohmann::json& j, Audit& audit) {
     j.at("internal_id").get_to(audit.internal_id);
     j.at("deadline_date").get_to(audit.deadline_date);
     j.at("auditor_pay_per_audit").get_to(audit.auditor_pay_per_audit);
-    j.at("pay_inc_hol").get_to(audit.pay_inc_hol);
+    //j.at("pay_inc_hol").get_to(audit.pay_inc_hol);
 
     // Automatically parse and map "site_coordinates" to your coords pair
     if (j.contains("site_coordinates") && !j["site_coordinates"].is_null()) {

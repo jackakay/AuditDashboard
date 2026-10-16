@@ -34,7 +34,7 @@ public:
     explicit ApiClient(const std::string& host);
     float getTotalMoneyEarnt(bool pending, const std::string& bearerToken);
     std::string getName(const std::string& bearerToken);
-    std::vector<std::string> getGoogleMapLinks(const RouteType route, const std::string& bearerToken, const json& audits, const Address addressType);
+    std::vector<Audit> getRoute(const RouteType route, const std::string& bearerToken, const std::string audits, const Address addressType);
     
     CognitoTokens authenticate(const std::string& username, const std::string& password) const;
     std::string login(const std::string& username, const std::string& password);
@@ -45,12 +45,12 @@ private:
     json convertCoordinatesToJson(const std::vector<Audit> audits) const;
     json getDistanceMatrix(const json& body) const;
     
-    std::vector<std::pair<double, double>> getBestRouteBruteForce(DistanceMatrix m) const;
+    std::vector<Audit> getBestRouteBruteForce(DistanceMatrix m, std::vector<Audit> audits) const;
 
-    std::string convertRouteToGoogleMapsLink(const std::vector<std::pair<double, double>>& route) const;
+    std::string convertRouteToGoogleMapsLink(const std::vector<Audit>& route) const;
     std::string runPythonAuth(const std::string& username, const std::string& password) const;
     bool isAuthenticated() const;
-    std::pair<double, double> getStartingLocation(const std::string& bearerToken, Address addressType);
+    Audit getStartingLocation(const std::string& bearerToken, Address addressType);
     DistanceMatrix getMatrix(const json& body) const;
     
 };

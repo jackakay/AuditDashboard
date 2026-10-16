@@ -79,8 +79,10 @@ void Dashboard::registerRoutes() {
             const std::string bearerToken = req.get_header_value("Authorization");
 
             Address addressType = (req.get_param_value("address") == "home") ? HOME : TERM;
-            auto links = apiClient.getGoogleMapLinks(route, bearerToken, data,  addressType);
-            json j = { {"links", links} };
+            std::vector<Audit> bestRoute = apiClient.getRoute(route, bearerToken, req.body,  addressType); //arrives in the order of optimality.
+            std::vector<std::string> links;
+            links.push_back(convertRouteToGoogleMapsLink(bestRoute));
+            json j = { {"links", links}, {"report", generateAuditRouteReport(bestRoute)} };
             res.set_content(j.dump(), "application/json");
         } catch (const std::exception& e) {
             res.status = 500;
@@ -94,5 +96,42 @@ std::string Dashboard::loadFile(const std::string& path) const {
     if (!file.is_open()) return "<h1>index.html not found</h1>";
     std::ostringstream ss;
     ss << file.rdbuf();
+    return ss.str();
+}
+
+
+
+std::string Dashboard::convertRouteToGoogleMapsLink(const std::vector<Audit>& route) const {
+    std::string link = "https://www.google.com/maps/dir/";
+    for (const auto& a : route) {
+        link += std::to_string(a.coords.second) + "," + std::to_string(a.coords.first) + "/";
+    }
+    return link;
+}
+
+std::string Dashboard::generateAuditRouteReport(const std::vector<Audit>& audits) {
+    std::ostringstream ss;
+
+    // Header block
+    ss << "========================================\r\n";
+    ss << "           SELECTED AUDIT ROUTE         \r\n";
+    ss << "========================================\r\n\r\n";
+
+    for (size_t i = 0; i < audits.size(); ++i) {
+        const auto& audit = audits[i];
+
+        ss << "Stop #" << (i + 1) << "\r\n";
+        ss << "----------------------------------------\r\n";
+        ss << "Site Name:     " << (audit.site_name.empty() ? "N/A" : audit.site_name) << "\r\n";
+        ss << "Post Code:     " << (audit.site_post_code.empty() ? "N/A" : audit.site_post_code) << "\r\n";
+        ss << "Client:        " << (audit.client_name.empty() ? "N/A" : audit.client_name) << "\r\n";
+        ss << "Internal ID:   " << (audit.internal_id.empty() ? "N/A" : audit.internal_id) << "\r\n";
+        ss << "Deadline:      " << (audit.deadline_date.empty() ? "N/A" : audit.deadline_date) << "\r\n";
+        
+        // Format the monetary value to 2 decimal places
+        ss << std::fixed << std::setprecision(2);
+        ss << "Pay (Inc. Hol): £" << audit.auditor_pay_per_audit << "\r\n\r\n";
+    }
+
     return ss.str();
 }

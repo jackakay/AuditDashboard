@@ -88,7 +88,7 @@ std::string ApiClient::getName(const std::string& bearerToken) {
 }
 
 
-std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route, const std::string& bearerToken, const json& j, const Address addressType) {
+std::vector<Audit> ApiClient::getRoute(const RouteType route, const std::string& bearerToken, const std::string j, const Address addressType) {
     if (bearerToken.empty()) throw std::runtime_error("Not authenticated");
     std::vector<std::string> links = { };
     int count{ 0 };
@@ -99,11 +99,12 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route, con
 
 
     
-    std::vector<std::pair<double, double>> coordinatePairs;
-    coordinatePairs.push_back(getStartingLocation(bearerToken, addressType)); // add the start location as the first element in the list of coordinates
+    // add the start location as the first element in the list of coordinates
     std::cout << "Audit locations succesfully found.\n";
+
     std::vector<Audit> auditRoute = json::parse(j);
-    
+    auditRoute.insert(auditRoute.begin(), getStartingLocation(bearerToken, addressType));
+
     //send distance matrix request to api, get back the distance matrix, and then we can work out the routes from there.
 
     json distanceMatrix = getDistanceMatrix(convertCoordinatesToJson(auditRoute));
@@ -120,24 +121,21 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route, con
             //only really works < 10.
 
             //We need to add a constant start/end point
-            std::vector<std::pair<double, double>> bestRoute = getBestRouteBruteForce(mat);
-            links.push_back(convertRouteToGoogleMapsLink(bestRoute));
-            break;
+            
+            return getBestRouteBruteForce(mat, auditRoute);
         }
         case RouteType::HELD_KARP: {
-            std::vector<std::pair<double, double>> bestRoute = HeldKarp::solve(mat);
-            links.push_back(convertRouteToGoogleMapsLink(bestRoute));
-            break;
+            return HeldKarp::solve(mat, auditRoute);
         }
         default:
             break;
 
     }
 
-    return links;
+    return {};
 }
 
-std::vector<std::pair<double, double>> ApiClient::getBestRouteBruteForce(DistanceMatrix m) const {
+std::vector<Audit> ApiClient::getBestRouteBruteForce(DistanceMatrix m, std::vector<Audit> audits) const {
     // Index 0 is strictly reserved as the start and end
     int numLocations = m.size();
     if (numLocations <= 1) return {};
@@ -188,30 +186,27 @@ std::vector<std::pair<double, double>> ApiClient::getBestRouteBruteForce(Distanc
 
     // 3. Reconstruct the final route coordinates using m's methods
     std::vector<std::pair<double, double>> bestRouteCoords;
-
+    std::vector<Audit> bestRoute;
     // Add Start Location
     bestRouteCoords.push_back(m.getCoords(0));
+    bestRoute.push_back(audits[0]);
 
     // Add winning middle stops in their optimal order
     for (int idx : bestPathIndices) {
         bestRouteCoords.push_back(m.getCoords(idx));
+        bestRoute.push_back(audits[idx]);
     }
 
     // Add End Location (same as Start)
     bestRouteCoords.push_back(m.getCoords(0));
+    bestRoute.push_back(audits[0]);
 
 
     //We could instead return a vector of the index of the audits?
-    return bestRouteCoords;
+    return bestRoute;
 }
 
-std::string ApiClient::convertRouteToGoogleMapsLink(const std::vector<std::pair<double, double>>& route) const {
-    std::string link = "https://www.google.com/maps/dir/";
-    for (const auto& [lng, lat] : route) {
-        link += std::to_string(lat) + "," + std::to_string(lng) + "/";
-    }
-    return link;
-}
+
 
 json ApiClient::convertCoordinatesToJson(const std::vector<Audit> audits) const {
     json body;
@@ -281,7 +276,7 @@ CognitoTokens ApiClient::authenticate(const std::string& username, const std::st
     };
 }
 
-std::pair<double, double> ApiClient::getStartingLocation(const std::string& bearerToken, Address addressType)  {
+Audit ApiClient::getStartingLocation(const std::string& bearerToken, Address addressType)  {
     if (bearerToken.empty()) throw std::runtime_error("Not authenticated");
     
     httplib::Headers headers = buildHeaders(bearerToken);
@@ -289,7 +284,8 @@ std::pair<double, double> ApiClient::getStartingLocation(const std::string& bear
     
     if (!res || res->status != 200) {
         std::cerr << "Failed to get auditor info\n";
-        return {0.0, 0.0};
+        Audit a = {.site_name = "ERROR", .coords = std::pair<double, double> {}};
+        return a;
     }
     
     json j = json::parse(res->body);
@@ -297,11 +293,13 @@ std::pair<double, double> ApiClient::getStartingLocation(const std::string& bear
         double lat = j["term_coordinates"]["lat"].get<double>();
         double lng = j["term_coordinates"]["lng"].get<double>();
         std::cout << "Term coordinates: " << lat << ", " << lng << "\n";
-        return {lng, lat};
+        Audit a = {.site_name = "Term address", .coords = {lng, lat}};
+        return a;
     }
     double lat = j["home_coordinates"]["lat"].get<double>();
     double lng = j["home_coordinates"]["lng"].get<double>();
     std::cout << "Home coordinates: " << lat << ", " << lng << "\n";
-    return {lng, lat};
+    Audit a = {.site_name = "Home address", .coords = {lng, lat}};
+    return a;
 }
 

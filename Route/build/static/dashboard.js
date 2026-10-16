@@ -185,6 +185,10 @@ function navigate(page) {
         <div class="modal-field-label">Expenses</div>
         <div class="expenses-text">${(a.estimated_expenses || 'None').trim()}</div>
       </div>
+      <div class="modal-field full">
+        <div class="modal-field-label">Audit info</div>
+        <div class="info-text">${(a.visit_info)}</div>
+      </div>
     `;
     document.getElementById('modal-backdrop').classList.add('open');
   }
@@ -410,6 +414,7 @@ function showPayslipDetail(i) {
       if (!res.ok || data.error) throw new Error(data.error || 'Failed');
       const links = data.links || [];
       const report = data.report;
+      downloadSelectedStopsAsText(report);
       if (links.length === 0) { container.innerHTML = '<div class="route-empty">No routes returned.</div>'; return; }
       container.innerHTML = links.map((url, i) => `
         <div class="route-link-item">
@@ -425,7 +430,7 @@ function showPayslipDetail(i) {
       btn.textContent = 'Generate route';
     }
 
-    downloadSelectedStopsAsText(report);
+    
   }
 
   

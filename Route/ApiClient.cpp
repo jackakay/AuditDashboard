@@ -102,14 +102,11 @@ std::vector<std::string> ApiClient::getGoogleMapLinks(const RouteType route, con
     std::vector<std::pair<double, double>> coordinatePairs;
     coordinatePairs.push_back(getStartingLocation(bearerToken, addressType)); // add the start location as the first element in the list of coordinates
     std::cout << "Audit locations succesfully found.\n";
-    for (const auto& audit : j) {
-        auto coords = audit["site_coordinates"];
-        coordinatePairs.emplace_back(coords["lng"].get<double>(), coords["lat"].get<double>());
-    } // now we have all pairs of coordinates left over
-
+    std::vector<Audit> auditRoute = json::parse(j);
+    
     //send distance matrix request to api, get back the distance matrix, and then we can work out the routes from there.
 
-    json distanceMatrix = getDistanceMatrix(convertCoordinatesToJson(coordinatePairs));
+    json distanceMatrix = getDistanceMatrix(convertCoordinatesToJson(auditRoute));
     DistanceMatrix mat = DistanceMatrix(distanceMatrix);
 
     switch (route) {
@@ -203,6 +200,8 @@ std::vector<std::pair<double, double>> ApiClient::getBestRouteBruteForce(Distanc
     // Add End Location (same as Start)
     bestRouteCoords.push_back(m.getCoords(0));
 
+
+    //We could instead return a vector of the index of the audits?
     return bestRouteCoords;
 }
 
@@ -214,12 +213,12 @@ std::string ApiClient::convertRouteToGoogleMapsLink(const std::vector<std::pair<
     return link;
 }
 
-json ApiClient::convertCoordinatesToJson(const std::vector<std::pair<double, double>>& coordinates) const {
+json ApiClient::convertCoordinatesToJson(const std::vector<Audit> audits) const {
     json body;
     body["locations"] = json::array();
 
-    for (const auto& [lng, lat] : coordinates) {
-        body["locations"].push_back({lng, lat}); 
+    for (const auto& a : audits) {
+        body["locations"].push_back({a.coords.first, a.coords.second}); 
     }
     return body;
 }

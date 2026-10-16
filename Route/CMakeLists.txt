@@ -20,5 +20,6 @@ add_executable(WebServer
     DistanceMatrix.h
     HeldKarp.cpp
     HeldKarp.h
+    Audit.h
 
 )

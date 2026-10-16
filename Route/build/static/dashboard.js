@@ -423,6 +423,8 @@ function showPayslipDetail(i) {
       btn.disabled = false;
       btn.textContent = 'Generate route';
     }
+
+    downloadSelectedStopsAsText();
   }
 
   
@@ -745,4 +747,49 @@ function updateSelectAllState() {
         selectAllCheckbox.checked = false;
         selectAllCheckbox.indeterminate = false;
     }
+}
+
+function downloadSelectedStopsAsText() {
+    // 1. Gather the selected stops from your table
+    const checkedBoxes = document.querySelectorAll('#route-stops-table .row-checkbox:checked');
+    const selectedStops = Array.from(checkedBoxes).map(cb => {
+        const index = cb.getAttribute('data-index');
+        return auditCache[index]; // Pulls the audit object from your cache[cite: 2]
+    });
+
+    if (selectedStops.length === 0) {
+        alert("Please select at least one audit stop to export.");
+        return;
+    }
+
+    // 2. Populate the text content dynamically
+    let fileContent = "========================================\r\n";
+    fileContent +=     "           SELECTED AUDIT ROUTE         \r\n";
+    fileContent +=     "========================================\r\n\r\n";
+
+    selectedStops.forEach((audit, index) => {
+        fileContent += `Stop #${index + 1}\r\n`;
+        fileContent += `----------------------------------------\r\n`;
+        fileContent += `Site Name:     ${audit.site_name || 'N/A'}\r\n`;
+        fileContent += `Post Code:     ${audit.site_post_code || 'N/A'}\r\n`;
+        fileContent += `Client:        ${audit.client_name || 'N/A'}\r\n`;
+        fileContent += `Internal ID:   ${audit.internal_id || audit.order_internal_id || 'N/A'}\r\n`;
+        fileContent += `Deadline:      ${audit.deadline_date ? new Date(audit.deadline_date).toLocaleDateString('en-GB') : 'N/A'}\r\n`;
+        fileContent += `Pay (Inc. Hol): £${Number(audit.auditor_pay_per_audit * HOLIDAY_RATE || 0).toFixed(2)}\r\n\r\n`;
+    });
+
+    // 3. Create a Blob and trigger the download
+    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'audit-route-stops.txt'; // Name of the downloaded file
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up memory
+    URL.revokeObjectURL(url);
 }

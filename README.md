@@ -14,6 +14,13 @@ A high-performance, lightweight C++ backend service that solves multi-stop routi
 
 ---
 
+## Showcase
+![login](Route/Images/login.png)
+![home](Route/Images/home.png)
+![payslips](Route/Images/payslips.png)
+![audit data](Route/Images/audit_data.png)
+![audit response](Route/Images/responses.png)
+
 ## Architecture Overview
 
 ```text
@@ -32,6 +39,7 @@ docker run -p 8080:8080 audit-dashboard-server
 <<<<<<< HEAD
 
 ## Ideas
-Select which audits to route
-text document storing the order in which to complete them.
+Select which audits to route - done
+text document storing the order in which to complete them. - done
+fix showAuditDetailFromResponse function in dashboard.js
 

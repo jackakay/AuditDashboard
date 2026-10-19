@@ -243,8 +243,8 @@ function navigate(page) {
 
     // generate biweekly periods from first cutoff
     const periods = [];
-    let cutoff  = new Date('2026-01-05T00:00:00Z');
-    let payDate = new Date('2026-01-14T00:00:00Z');
+    let cutoff  = new Date('2025-01-05T00:00:00Z');
+    let payDate = new Date('2025-01-14T00:00:00Z');
     const today = new Date();
 
     while (cutoff <= today) {
@@ -404,6 +404,11 @@ function showPayslipDetail(i) {
   }
 
   async function fetchRoute() {
+    var selectedStops = getSelectedStops();
+    if(selectedStops.length < 1){
+      alert("No audits selected");
+      return;
+    }
     const btn = document.getElementById('fetch-btn');
     const container = document.getElementById('route-links');
     const errEl = document.getElementById('route-error');
@@ -413,10 +418,12 @@ function showPayslipDetail(i) {
     container.innerHTML = '<div class="route-empty">Calculating...</div>';
     homeValue = dropdownState.address;
     selectedRoute = dropdownState.route;
-    var selectedStops = getSelectedStops();
-
+    
+    
     let requestBody = JSON.stringify(selectedStops);
     console.log(requestBody);
+
+    
     try {
       // route stays on local C++ server - this is where the algorithm lives
       const res = await fetch(`/api/route?type=${selectedRoute}&address=${homeValue}`, {

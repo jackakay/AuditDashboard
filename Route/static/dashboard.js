@@ -137,8 +137,12 @@ function navigate(page) {
     }
   }
 
-  function showAuditDetail(i) {
-    const a = auditCache[i];
+  function showAuditDetail(i, response=false, completed=false, auditObj = null) {
+    var a;
+    if(auditObj == null){
+      if(completed) a = completedCache[i];
+      else a =  auditCache[i];
+    }else a = auditObj;
     if (!a) return;
     const deadline    = new Date(a.deadline_date);
     const daysLeft    = Math.ceil((deadline - Date.now()) / 86400000);
@@ -189,7 +193,21 @@ function navigate(page) {
         <div class="modal-field-label">Audit info</div>
         <div class="info-text">${(a.visit_info)}</div>
       </div>
+      <div class="modal-field full">
+        <div class="modal-field-label" id="responses">Responses</div>
+        <div class="info-text">
     `;
+    if(response) a.survey_answers.forEach((x) => {
+      console.log(JSON.stringify(a));
+      document.getElementById('responses').innerHTML += `
+      <div class="modal-field full">
+        <div class="modal-field-value">${(x.id)}</div>
+        <div class="modal-field-value">${(x.value)}</div>
+      </div>`
+      });
+      
+      document.getElementById('modal-body').innerHTML += `</div>
+      </div>`;
     document.getElementById('modal-backdrop').classList.add('open');
   }
 
@@ -611,12 +629,17 @@ function showPayslipDetail(i) {
       String(a.internal_id) === String(auditID) || 
       String(a.order_internal_id) === String(auditID)
     );
-    console.log(completedCache.length);
+    //console.log(completedCache.length);
     if (!auditObj) {
       alert('Audit not found in cache.');
       return;
     }
-    console.log(JSON.stringify(auditObj));
+    //console.log(JSON.stringify(auditObj));
+    showAuditDetail(auditObj, true, true, auditObj);
+    //a.survey_answers contains what we are looking for
+    //find format we used for view audits
+    
+
   }
 
   //dropdown functionality 

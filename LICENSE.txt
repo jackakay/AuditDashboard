@@ -1,0 +1,5 @@
+Copyright (c) 2026 [Your Name]
+
+Permission is granted to use this software for personal, educational, and 
+non-commercial purposes only. Commercial use, or use within a corporate 
+or for-profit environment, is strictly prohibited without a commercial license.

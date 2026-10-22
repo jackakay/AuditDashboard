@@ -38,6 +38,14 @@ docker build -t audit-dashboard-server .
 docker run -p 8080:8080 audit-dashboard-server
 <<<<<<< HEAD
 
+
+# Run with cmake
+```
+pip install pycognito
+mkdir build
+cd build
+cmake .. ; cmake --build ./ ; ./Debug/WebServer.exe
+```
 ## Ideas
 Select which audits to route - done
 text document storing the order in which to complete them. - done

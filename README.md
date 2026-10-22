@@ -8,7 +8,6 @@ A high-performance, lightweight C++ backend service that solves multi-stop routi
 ## Key Features
 
 * **Exact TSP Solver (Held-Karp):** Unlike greedy heuristics (like Nearest Neighbor) that compromise on route quality, this implementation guarantees mathematical optimality using bitmasking dynamic programming ($O(n^2 2^n)$ time complexity).
-* **Decoupled Architecture:** Clean separation of concerns with a dedicated `DistanceMatrix` class for parsing JSON payloads and a static `HeldKarp` utility class.
 * **Modern C++ Core:** Written in standard C++ with zero heavy external dependencies outside of standard utilities and `nlohmann/json`.
 * **Containerized Deployment:** Fully dockerized for seamless builds and environment consistency.
 

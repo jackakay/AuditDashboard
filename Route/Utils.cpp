@@ -2,7 +2,7 @@
 
 
 namespace Utils {
-     std::string Utils::readBearerToken(const std::string& filename) {
+     std::string Utils::Utils::readBearerToken(const std::string& filename) {
         std::ifstream file(filename);
         if (!file.is_open()) {
             std::cerr << "Failed to open bearer token file: " << filename << std::endl;
@@ -13,7 +13,7 @@ namespace Utils {
         return token;
     }
 
-    UserCredentials Utils::getUserCredentials() {
+    UserCredentials Utils::Utils::getUserCredentials() {
         std::string username, password;
         std::cout << "Enter your username: ";
         std::cin >> username;
@@ -21,7 +21,7 @@ namespace Utils {
         std::cin >> password;
         return UserCredentials{ username, password };
     }
-    std::string Utils::getEnv(const std::string& name) {
+    std::string Utils::Utils::getEnv(const std::string& name) {
         #ifdef _WIN32
             char* buf = nullptr;
             size_t len = 0;
@@ -36,7 +36,7 @@ namespace Utils {
             return v;
         #endif
     }
-    inline void Utils::loadDotEnv(const std::string& path = ".env") {
+    void Utils::Utils::loadDotEnv(const std::string& path) {
         std::ifstream file(path);
         if (!file) return;  // no .env is fine (e.g. on Render)
 

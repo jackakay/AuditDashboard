@@ -4,10 +4,16 @@
 using namespace std;
 
 int main() {
-    Utils::Utils::loadDotEnv(); 
-    ApiClient apiClient("www.secure-servelegal.co.uk");
-    Dashboard dashboard(apiClient);
+    try {
+        Utils::Utils::loadDotEnv(".env");   
+        ApiClient apiClient("www.secure-servelegal.co.uk");
+        Dashboard dashboard(apiClient);
+        
+        dashboard.start();
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Fatal error: " << e.what() << std::endl;
+        return 1;
+    }
     
-    dashboard.start();
-    return 0;
 }

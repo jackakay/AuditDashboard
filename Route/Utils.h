@@ -16,7 +16,7 @@ namespace Utils {
             static std::string readBearerToken(const std::string& filename);
             static UserCredentials getUserCredentials();
             static std::string getEnv(const std::string& name);
-            static inline void loadDotEnv(const std::string& path = ".env");
+            static void loadDotEnv(const std::string& path = ".env");
     };
     
 }

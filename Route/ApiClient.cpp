@@ -10,7 +10,7 @@
 #endif
 
 const float HOLIDAY_PAY = 1.12f;
-const std::string OPENROUTE_API = Utils::Utils::getEnv("OPENROUTE_API"); 
+
 
 ApiClient::ApiClient(const std::string& host)
     : cli(host)
@@ -225,7 +225,7 @@ json ApiClient::getDistanceMatrix(const json& body) const {
 
     auto headers = httplib::Headers {
         { "Accept", "application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8" },
-        { "Authorization", OPENROUTE_API}
+        { "Authorization", Utils::Utils::getEnv("OPENROUTE_API") }
     };
     
     auto res = cli.Post("/v2/matrix/driving-car", headers, body.dump(), "application/json");

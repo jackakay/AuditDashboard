@@ -1,671 +1,817 @@
-let selectedRoute = 'brute';
-let auditCache = [];
-let completedCache = [];
-let payslipData = null;
-let responseSearchRows = [];
-let responseById = new Map();
+'use strict';
 
-async function getApprovedAuditData() {
-  if (payslipData) return payslipData;
+/*
+ * Audit Dashboard frontend
+ *
+ * Depends on globals defined elsewhere: sl(), local(), HOLIDAY_RATE, MILEAGE.
+ *
+ * Sections:
+ *   1. State
+ *   2. Helpers (escaping, formatting, money)
+ *   3. API
+ *   4. Navigation, login, logout
+ *   5. Home (assigned audits)
+ *   6. Audit detail modal
+ *   7. Payslips
+ *   8. View responses
+ *   9. Routes
+ *  10. Dropdowns
+ *  11. Init
+ */
 
-  const res = await sl('/api/v3/audits?limit=200&status=approved,approving_query,submitted,client_query');
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
+/* ========================================================================
+ * 1. State
+ * ====================================================================== */
 
-  const numPages = data.pages;
-  const items = data.items || [];
+const state = {
+  assigned: [],          // audits with status "assigned"
+  completed: null,       // approved / submitted audits (null = not loaded)
+  completedPromise: null,
+  payslips: [],          // pay periods built from completed audits
+  responseRows: [],      // search index for the responses page
+  responseById: new Map(),
+  lastRouteReport: null, // text report from the last generated route
+};
 
-  for (let i = 2; i <= numPages; i++) {
-    const r = await sl('/api/v3/audits?limit=200&status=approved,approving_query,submitted,client_query&page=' + i);
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    items.push(...(d.items || []));
-  }
-  completedCache = items;
-  payslipData = items;
-  buildResponseIndexes(items);
+const dropdownState = { route: 'brute', address: 'home' };
 
-  return payslipData;
+function resetState() {
+  state.assigned = [];
+  state.completed = null;
+  state.completedPromise = null;
+  state.payslips = [];
+  state.responseRows = [];
+  state.responseById = new Map();
+  state.lastRouteReport = null;
 }
 
+/* ========================================================================
+ * 2. Helpers
+ * ====================================================================== */
+
+const DAY_MS = 86400000;
+const COMPLETED_STATUSES = 'approved,approving_query,submitted,client_query';
+const EXPENSE_FIELDS = [
+  'reclaimable_expenses',
+  'reclaimable_expenses_2',
+  'reclaimable_expenses_3',
+  'reclaimable_expenses_4',
+];
+
+// First pay-period cutoff and its pay date; later periods are every 14 days.
+const PAY_ANCHOR_CUTOFF = new Date('2025-01-05T00:00:00Z');
+const PAY_ANCHOR_PAYDAY = new Date('2025-01-14T00:00:00Z');
+
+const $ = id => document.getElementById(id);
+
+function setText(id, text) {
+  const el = $(id);
+  if (el) el.textContent = text;
+}
+
+// Escape anything that comes from the API before putting it in innerHTML.
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]));
+
+const fmtDate = d => new Date(d).toLocaleDateString('en-GB', {
+  day: 'numeric', month: 'short', year: 'numeric',
+});
+
+const money = n => '\u00a3' + (Number(n) || 0).toFixed(2);
+
+const sumBy = (items, fn) => items.reduce((s, a) => s + fn(a), 0);
+const num = v => Number(v) || 0;
+const expensesOf = a => EXPENSE_FIELDS.reduce((s, k) => s + num(a[k]), 0);
+
+// level is '' | 'warn' | 'urgent'
+function urgencyOf(deadline) {
+  const daysLeft = Math.ceil((new Date(deadline) - Date.now()) / DAY_MS);
+  const level = daysLeft <= 2 ? 'urgent' : daysLeft <= 5 ? 'warn' : '';
+  return { daysLeft, level };
+}
+
+const loadingHtml = (msg = 'Loading...') =>
+  `<div style="font-size:13px;color:var(--nord3)">${esc(msg)}</div>`;
+
+const emptyRow = (cols, msg) =>
+  `<tr><td colspan="${cols}" class="table-empty">${esc(msg)}</td></tr>`;
+
+/* ========================================================================
+ * 3. API
+ * ====================================================================== */
+
+async function slJson(path) {
+  const res = await sl(path);
+  if (res.status === 401) {
+    doLogout();
+    throw new Error('Session expired. Please sign in again.');
+  }
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+// Fetches every page for a status filter. Sequential to stay friendly to the API.
+async function fetchAllAudits(status) {
+  const url = page => `/api/v3/audits?limit=200&status=${status}&page=${page}`;
+  const first = await slJson(url(1));
+  const items = [...(first.items || [])];
+  for (let page = 2; page <= (first.pages || 1); page++) {
+    const next = await slJson(url(page));
+    items.push(...(next.items || []));
+  }
+  return items;
+}
+
+// Loads completed audits once and shares the in-flight request.
+function getCompletedAudits() {
+  if (!state.completedPromise) {
+    state.completedPromise = fetchAllAudits(COMPLETED_STATUSES)
+      .then(items => {
+        state.completed = items;
+        buildResponseIndexes(items);
+        return items;
+      })
+      .catch(err => {
+        state.completedPromise = null; // allow retry
+        throw err;
+      });
+  }
+  return state.completedPromise;
+}
+
+/* ========================================================================
+ * 4. Navigation, login, logout
+ * ====================================================================== */
+
+const PAGE_LOADERS = {
+  payslips: loadPayslips,
+  'view-responses': loadViewResponses,
+  routes: loadRoutes,
+};
+
 function navigate(page) {
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
-    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
-    document.getElementById('page-' + page).classList.add('active');
-    if (page === 'payslips') loadPayslips();
-    if (page === 'notes') loadNotes();
-    if (page === 'view-responses') loadViewResponses();
-    if(page === 'routes') loadRoutes();
+  document.querySelectorAll('.nav-item').forEach(el =>
+    el.classList.toggle('active', el.dataset.page === page));
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  $('page-' + page).classList.add('active');
+  const loader = PAGE_LOADERS[page];
+  if (loader) loader();
+}
+
+async function doLogin() {
+  const username = $('usr').value.trim();
+  const password = $('pwd').value;
+  const btn = $('login-btn');
+  const err = $('login-error');
+
+  if (btn.disabled) return;
+  if (!username || !password) {
+    err.textContent = 'Please enter your email and password.';
+    return;
   }
 
-  async function doLogin() {
-    const username = document.getElementById('usr').value.trim();
-    const password = document.getElementById('pwd').value;
-    const btn = document.getElementById('login-btn');
-    const err = document.getElementById('login-error');
-    if (!username || !password) { err.textContent = 'Please enter your email and password.'; return; }
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Signing in...';
-    err.textContent = '';
-    try {
-      const res = await local('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || 'Login failed');
-      sessionStorage.setItem('bearer', data.bearer);   // data.bearer as confirmed
-      showDashboard();
-    } catch (e) {
-      err.textContent = e.message;
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = 'Sign in';
-    }
-  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Signing in...';
+  err.textContent = '';
 
-  function showDashboard() {
-    document.getElementById('login-screen').style.display = 'none';
-    const dash = document.getElementById('dashboard-screen');
-    dash.style.display = 'flex';
-    dash.style.flexDirection = 'column';
-    loadName();
-    loadHomeData();
-  }
-
-  async function loadName() {
-    try {
-      const res = await sl('/api/v1/auditors/me');
-      const data = await res.json();
-      document.getElementById('topbar-name').textContent = data.preferred_name || '';
-    } catch (_) {}
-  }
-
-  async function loadHomeData() {
-    const tbody = document.getElementById('audit-tbody');
-    tbody.innerHTML = '<tr><td colspan="4" class="table-empty">Loading...</td></tr>';
-    try {
-      const res = await sl('/api/v3/audits?limit=200&status=assigned');
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
-      const numPages = data.pages;
-      auditCache = data.items || [];
-
-      for (let i = 2; i <= numPages; i++) {
-        const r = await sl('/api/v3/audits?limit=200&status=assigned&page=' + i);
-        const d = await r.json();
-        if (d.error) throw new Error(d.error);
-        auditCache.push(...(d.items || []));
-      }
-      const rawPay = auditCache.reduce((s, a) => s + (a.auditor_pay_per_audit || 0), 0);
-
-      document.getElementById('stat-count').textContent   = auditCache.length;
-      document.getElementById('stat-pending').textContent = '\u00a3' + rawPay.toFixed(2);
-      document.getElementById('stat-holiday').textContent = '\u00a3' + (rawPay * HOLIDAY_RATE).toFixed(2);
-
-      if (auditCache.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No audits currently assigned.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = auditCache.map((a, i) => {
-        const deadline    = new Date(a.deadline_date);
-        const daysLeft    = Math.ceil((deadline - Date.now()) / 86400000);
-        const urgency     = daysLeft <= 2 ? 'urgent' : daysLeft <= 5 ? 'warn' : '';
-        const deadlineStr = deadline.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-        return `
-          <tr>
-            <td data-label="Audit">
-              <div class="tbl-primary">${a.site_name}</div>
-              <div class="tbl-secondary">${a.site_post_code} \u00b7 ${a.client_name}</div>
-            </td>
-            <td data-label="Deadline">
-              <span class="deadline-badge ${urgency}">${deadlineStr}</span>
-              <span class="days-left ${urgency}">${daysLeft}d left</span>
-            </td>
-            <td data-label="Pay" class="pay-cell">\u00a3${Number(a.auditor_pay_per_audit * HOLIDAY_RATE || 0).toFixed(2)}</td>
-            <td><button class="info-btn" onclick="showAuditDetail(${i})">Details</button></td>
-          </tr>
-        `;
-      }).join('');
-
-    } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="4" class="table-empty">Could not load audits.</td></tr>';
-      document.getElementById('home-error').textContent = e.message;
-    }
-  }
-
-  function showAuditDetail(i, response=false, completed=false, auditObj = null) {
-    var a;
-    if(auditObj == null){
-      if(completed) a = completedCache[i];
-      else a =  auditCache[i];
-    }else a = auditObj;
-    if (!a) return;
-    const deadline    = new Date(a.deadline_date);
-    const daysLeft    = Math.ceil((deadline - Date.now()) / 86400000);
-    const urgency     = daysLeft <= 2 ? 'red' : daysLeft <= 5 ? 'amber' : '';
-    const deadlineStr = deadline.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    const startStr    = new Date(a.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    const endStr      = new Date(a.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    document.getElementById('modal-title').textContent    = a.site_name;
-    document.getElementById('modal-subtitle').textContent = a.internal_id + ' \u00b7 ' + a.client_name;
-    document.getElementById('modal-body').innerHTML = `
-      <div class="modal-field">
-        <div class="modal-field-label">Post code</div>
-        <div class="modal-field-value">${a.site_post_code}</div>
-      </div>
-      <div class="modal-field">
-        <div class="modal-field-label">Visit type</div>
-        <div class="modal-field-value">${a.item_to_order}</div>
-      </div>
-      <div class="modal-field">
-        <div class="modal-field-label">Base pay</div>
-        <div class="modal-field-value mono green">\u00a3${Number(a.auditor_pay_per_audit).toFixed(2)}</div>
-      </div>
-      <div class="modal-field">
-        <div class="modal-field-label">Inc. holiday pay</div>
-        <div class="modal-field-value mono green">\u00a3${(a.auditor_pay_per_audit * HOLIDAY_RATE).toFixed(2)}</div>
-      </div>
-      <div class="modal-field">
-        <div class="modal-field-label">Deadline</div>
-        <div class="modal-field-value ${urgency}">${deadlineStr} (${daysLeft}d left)</div>
-      </div>
-      <div class="modal-field">
-        <div class="modal-field-label">Order window</div>
-        <div class="modal-field-value">${startStr} - ${endStr}</div>
-      </div>
-      <div class="modal-field">
-        <div class="modal-field-label">Order ID</div>
-        <div class="modal-field-value mono">${a.order_internal_id}</div>
-      </div>
-      <div class="modal-field">
-        <div class="modal-field-label">Schedule</div>
-        <div class="modal-field-value">${a.order_schedule_type.replace(/_/g, ' ')}</div>
-      </div>
-      <div class="modal-field full">
-        <div class="modal-field-label">Expenses</div>
-        <div class="expenses-text">${(a.estimated_expenses || 'None').trim()}</div>
-      </div>
-      <div class="modal-field full">
-        <div class="modal-field-label">Audit info</div>
-        <div class="info-text">${(a.visit_info)}</div>
-      </div>
-      <div class="modal-field full">
-        <div class="modal-field-label" id="responses">Responses</div>
-        <div class="info-text">
-    `;
-    if(response) a.survey_answers.forEach((x) => {
-      console.log(JSON.stringify(a));
-      document.getElementById('responses').innerHTML += `
-      <div class="modal-field full">
-        <div class="modal-field-value">${(x.id)}</div>
-        <div class="modal-field-value">${(x.value)}</div>
-      </div>`
-      });
-      
-      document.getElementById('modal-body').innerHTML += `</div>
-      </div>`;
-    document.getElementById('modal-backdrop').classList.add('open');
-  }
-
-  function closeModal(e) { if (e.target === document.getElementById('modal-backdrop')) closeModalDirect(); }
-  function closeModalDirect() { document.getElementById('modal-backdrop').classList.remove('open'); }
-
-  async function loadPayslips() {
-    const list = document.getElementById('payslip-list');
-    list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Loading...</div>';
-
-    try {
-      const items = await getApprovedAuditData();
-      renderPayslips(items);
-    } catch (e) {
-      list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Could not load payslips.</div>';
-      document.getElementById('payslips-error').textContent = e.message;
-    }
-  }
-
-  async function renderPayslips(items) {
-    const list = document.getElementById('payslip-list');
-  
-    list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Loading...</div>';
-    try{
-    const total            = items.reduce((s, a) => s + (Number(a.total_pay) || 0), 0);
-    const mileage          = items.reduce((s, a) => s + (Number(a.mileage) || 0), 0);
-    const reclaimableRaw   = items.reduce((s, a) => {
-      const fields = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4'];
-      return s + fields.reduce((s2, k) => s2 + (Number(a[k]) || 0), 0);
-    }, 0);
-    //const totalWithHoliday  = total * HOLIDAY_RATE;
-    const totalWithExpenses = total + reclaimableRaw + (mileage * MILEAGE);
-
-    // generate biweekly periods from first cutoff
-    const periods = [];
-    let cutoff  = new Date('2025-01-05T00:00:00Z');
-    let payDate = new Date('2025-01-14T00:00:00Z');
-    const today = new Date();
-
-    while (cutoff <= today) {
-      const periodStart = new Date(cutoff.getTime() - 14 * 86400000);
-      periods.push({ periodStart, periodEnd: new Date(cutoff), payDate: new Date(payDate), audits: [] });
-      cutoff  = new Date(cutoff.getTime()  + 14 * 86400000);
-      payDate = new Date(payDate.getTime() + 14 * 86400000);
-    }
-
-    // Add the current open period for the next payday
-    const periodStart = new Date(cutoff.getTime() - 14 * 86400000);
-    periods.push({ periodStart, periodEnd: new Date(cutoff), payDate: new Date(payDate), audits: [] });
-
-    // bucket by approval_date
-    items.forEach(a => {
-      if (!a.approval_date) return;
-      const approved = new Date(a.approval_date);
-      const period = periods.find(p => approved >= p.periodStart && approved < p.periodEnd);
-      if (period) period.audits.push(a);
+  try {
+    const res = await local('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
     });
-
-    const filled = periods
-      .filter(p => p.audits.length > 0)
-      .sort((a, b) => b.payDate - a.payDate);
-
-    window.payslipCache = filled;
-
-    const fmt = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-
-    list.innerHTML = `
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="stat-label">Total earned</div>
-          <div class="stat-value stat-accent">\u00a3${total.toFixed(2)}</div>
-        </div>
-        
-        <div class="stat-card">
-          <div class="stat-label">Audits completed</div>
-          <div class="stat-value">${items.length}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total + expenses</div>
-          <div class="stat-value stat-accent">\u00a3${totalWithExpenses.toFixed(2)}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total mileage</div>
-          <div class="stat-value stat-accent">${mileage.toFixed(2)}</div>
-        </div>
-      </div>
-
-      <div class="table-wrap" style="margin-top:1.5rem">
-        <table>
-          <thead>
-            <tr>
-              <th>Pay date</th>
-              <th>Earnings</th>
-              <th>Earnings + expenses</th>
-              <th>Pay period</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${filled.map((p, i) => {
-              const earnings = p.audits.reduce((s, a) => s + (Number(a.total_pay) || 0), 0);
-              const expenses = p.audits.reduce((s, a) => {
-                const fields = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4'];
-                return s + fields.reduce((s2, k) => s2 + (Number(a[k]) || 0), 0);
-              }, 0);
-              const periodMileage = p.audits.reduce((s, a) => s + (Number(a.mileage) || 0), 0);
-              //const earningsWithHoliday = earnings * HOLIDAY_RATE;
-              const earningsWithAll = earnings + expenses + (periodMileage * MILEAGE);
-              return `
-                <tr>
-                  <td data-label="Pay date"><span class="deadline-badge">${fmt(p.payDate)}</span></td>
-                  <td data-label="Earnings" class="pay-cell">\u00a3${earnings.toFixed(2)}</td>
-                  <td data-label="+ Expenses" class="pay-cell">\u00a3${earningsWithAll.toFixed(2)}</td>
-                  <td data-label="Period"><span class="tbl-secondary">${fmt(p.periodStart)} - ${fmt(p.periodEnd)}</span></td>
-                  <td><button class="info-btn" onclick="showPayslipDetail(${i})">Details</button></td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Login failed');
+    sessionStorage.setItem('bearer', data.bearer);
+    showDashboard();
   } catch (e) {
-    list.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Could not load payslips.</div>';
-    document.getElementById('payslips-error').textContent = e.message;
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Sign in';
   }
+}
+
+function showDashboard() {
+  $('login-screen').style.display = 'none';
+  const dash = $('dashboard-screen');
+  dash.style.display = 'flex';
+  dash.style.flexDirection = 'column';
+  loadName();
+  loadHomeData();
+}
+
+async function loadName() {
+  try {
+    const data = await slJson('/api/v1/auditors/me');
+    setText('topbar-name', data.preferred_name || '');
+  } catch (_) { /* name is cosmetic */ }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('bearer');
+  resetState();
+  closeModalDirect();
+
+  // Remove rendered data from the DOM as well as from memory.
+  $('payslip-list').innerHTML = '';
+  $('view-responses-container').innerHTML = '';
+  const routeBody = routeTbody();
+  if (routeBody) routeBody.innerHTML = '';
+  $('audit-tbody').innerHTML = emptyRow(4, 'Loading...');
+  $('route-links').innerHTML = '<div class="route-empty">Select a method and generate a route.</div>';
+  ['stat-pending', 'stat-holiday', 'stat-count'].forEach(id => setText(id, '-'));
+  ['home-error', 'payslips-error', 'route-error'].forEach(id => setText(id, ''));
+
+  $('login-screen').style.display = 'flex';
+  $('dashboard-screen').style.display = 'none';
+  $('usr').value = '';
+  $('pwd').value = '';
+  navigate('home');
+}
+
+/* ========================================================================
+ * 5. Home (assigned audits)
+ * ====================================================================== */
+
+async function loadHomeData() {
+  const tbody = $('audit-tbody');
+  tbody.innerHTML = emptyRow(4, 'Loading...');
+  setText('home-error', '');
+
+  try {
+    state.assigned = await fetchAllAudits('assigned');
+
+    const rawPay = sumBy(state.assigned, a => num(a.auditor_pay_per_audit));
+    setText('stat-count', state.assigned.length);
+    setText('stat-pending', money(rawPay));
+    setText('stat-holiday', money(rawPay * HOLIDAY_RATE));
+
+    if (state.assigned.length === 0) {
+      tbody.innerHTML = emptyRow(4, 'No audits currently assigned.');
+      return;
+    }
+
+    tbody.innerHTML = state.assigned.map((a, i) => {
+      const { daysLeft, level } = urgencyOf(a.deadline_date);
+      return `
+        <tr>
+          <td data-label="Audit">
+            <div class="tbl-primary">${esc(a.site_name)}</div>
+            <div class="tbl-secondary">${esc(a.site_post_code)} \u00b7 ${esc(a.client_name)}</div>
+          </td>
+          <td data-label="Deadline">
+            <span class="deadline-badge ${level}">${fmtDate(a.deadline_date)}</span>
+            <span class="days-left ${level}">${daysLeft}d left</span>
+          </td>
+          <td data-label="Pay" class="pay-cell">${money(num(a.auditor_pay_per_audit) * HOLIDAY_RATE)}</td>
+          <td><button class="info-btn" data-action="assigned-detail" data-index="${i}">Details</button></td>
+        </tr>
+      `;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = emptyRow(4, 'Could not load audits.');
+    setText('home-error', e.message);
+  }
+}
+
+/* ========================================================================
+ * 6. Audit detail modal
+ * ====================================================================== */
+
+// valueHtml must already be escaped.
+function modalField(label, valueHtml, { full = false, valueClass = 'modal-field-value' } = {}) {
+  return `
+    <div class="modal-field${full ? ' full' : ''}">
+      <div class="modal-field-label">${esc(label)}</div>
+      <div class="${valueClass}">${valueHtml}</div>
+    </div>`;
+}
+
+function openAuditModal(a, { showResponses = false } = {}) {
+  if (!a) return;
+
+  const { daysLeft, level } = urgencyOf(a.deadline_date);
+  const deadlineClass = { urgent: 'red', warn: 'amber' }[level] || '';
+  const basePay = num(a.auditor_pay_per_audit);
+
+  const responsesHtml = showResponses
+    ? `
+      <div class="modal-field full">
+        <div class="modal-field-label">Responses</div>
+        <div class="info-text">
+          ${(a.survey_answers || []).map(x => `
+            <div class="modal-field full">
+              <div class="modal-field-value">${esc(x.id)}</div>
+              <div class="modal-field-value">${esc(x.value)}</div>
+            </div>`).join('')}
+        </div>
+      </div>`
+    : '';
+
+  $('modal-title').textContent = a.site_name || '';
+  $('modal-subtitle').textContent = `${a.internal_id || ''} \u00b7 ${a.client_name || ''}`;
+  $('modal-body').innerHTML = [
+    modalField('Post code', esc(a.site_post_code)),
+    modalField('Visit type', esc(a.item_to_order)),
+    modalField('Base pay', money(basePay), { valueClass: 'modal-field-value mono green' }),
+    modalField('Inc. holiday pay', money(basePay * HOLIDAY_RATE), { valueClass: 'modal-field-value mono green' }),
+    modalField('Deadline', `${fmtDate(a.deadline_date)} (${daysLeft}d left)`,
+      { valueClass: `modal-field-value ${deadlineClass}` }),
+    modalField('Order window', `${fmtDate(a.start_date)} - ${fmtDate(a.end_date)}`),
+    modalField('Order ID', esc(a.order_internal_id), { valueClass: 'modal-field-value mono' }),
+    modalField('Schedule', esc(String(a.order_schedule_type || '').replace(/_/g, ' '))),
+    modalField('Expenses', esc(String(a.estimated_expenses || 'None').trim()),
+      { full: true, valueClass: 'expenses-text' }),
+    modalField('Audit info', esc(a.visit_info), { full: true, valueClass: 'info-text' }),
+    responsesHtml,
+  ].join('');
+
+  $('modal-backdrop').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target === $('modal-backdrop')) closeModalDirect();
+}
+
+function closeModalDirect() {
+  $('modal-backdrop').classList.remove('open');
+}
+
+/* ========================================================================
+ * 7. Payslips
+ * ====================================================================== */
+
+// Pure: groups audits into fortnightly pay periods by approval date.
+// Returns only periods that contain audits, newest pay date first.
+function buildPayPeriods(items, today = new Date()) {
+  const periods = [];
+  const makePeriod = (cutoff, payDate) => ({
+    periodStart: new Date(cutoff.getTime() - 14 * DAY_MS),
+    periodEnd: new Date(cutoff),
+    payDate: new Date(payDate),
+    audits: [],
+  });
+
+  let cutoff = new Date(PAY_ANCHOR_CUTOFF);
+  let payDate = new Date(PAY_ANCHOR_PAYDAY);
+
+  while (cutoff <= today) {
+    periods.push(makePeriod(cutoff, payDate));
+    cutoff = new Date(cutoff.getTime() + 14 * DAY_MS);
+    payDate = new Date(payDate.getTime() + 14 * DAY_MS);
+  }
+  // Current open period (next payday)
+  periods.push(makePeriod(cutoff, payDate));
+
+  items.forEach(a => {
+    if (!a.approval_date) return;
+    const approved = new Date(a.approval_date);
+    const period = periods.find(p => approved >= p.periodStart && approved < p.periodEnd);
+    if (period) period.audits.push(a);
+  });
+
+  return periods
+    .filter(p => p.audits.length > 0)
+    .sort((a, b) => b.payDate - a.payDate);
+}
+
+async function loadPayslips() {
+  const list = $('payslip-list');
+  list.innerHTML = loadingHtml();
+  setText('payslips-error', '');
+
+  try {
+    const items = await getCompletedAudits();
+    renderPayslips(items);
+  } catch (e) {
+    list.innerHTML = loadingHtml('Could not load payslips.');
+    setText('payslips-error', e.message);
+  }
+}
+
+function renderPayslips(items) {
+  const list = $('payslip-list');
+
+  const total = sumBy(items, a => num(a.total_pay));
+  const mileage = sumBy(items, a => num(a.mileage));
+  const expenses = sumBy(items, expensesOf);
+  const totalWithExpenses = total + expenses + mileage * MILEAGE;
+
+  state.payslips = buildPayPeriods(items);
+
+  const rows = state.payslips.map((p, i) => {
+    const earnings = sumBy(p.audits, a => num(a.total_pay));
+    const periodExpenses = sumBy(p.audits, expensesOf);
+    const periodMileage = sumBy(p.audits, a => num(a.mileage));
+    const earningsWithAll = earnings + periodExpenses + periodMileage * MILEAGE;
+    return `
+      <tr>
+        <td data-label="Pay date"><span class="deadline-badge">${fmtDate(p.payDate)}</span></td>
+        <td data-label="Earnings" class="pay-cell">${money(earnings)}</td>
+        <td data-label="+ Expenses" class="pay-cell">${money(earningsWithAll)}</td>
+        <td data-label="Period"><span class="tbl-secondary">${fmtDate(p.periodStart)} - ${fmtDate(p.periodEnd)}</span></td>
+        <td><button class="info-btn" data-action="payslip-detail" data-index="${i}">Details</button></td>
+      </tr>`;
+  }).join('');
+
+  list.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total earned</div>
+        <div class="stat-value stat-accent">${money(total)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Audits completed</div>
+        <div class="stat-value">${items.length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total + expenses</div>
+        <div class="stat-value stat-accent">${money(totalWithExpenses)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total mileage</div>
+        <div class="stat-value stat-accent">${mileage.toFixed(2)}</div>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-top:1.5rem">
+      <table>
+        <thead>
+          <tr>
+            <th>Pay date</th>
+            <th>Earnings</th>
+            <th>Earnings + expenses</th>
+            <th>Pay period</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 function showPayslipDetail(i) {
-  const p = window.payslipCache[i];
+  const p = state.payslips[i];
   if (!p) return;
-  const fmt = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  const earnings    = p.audits.reduce((s, a) => s + (Number(a.auditor_pay_per_audit) || 0), 0);
-  const holidayPay  = p.audits.reduce((s, a) => s + (Number(a.holiday_pay) || 0), 0);
-  const expenses    = p.audits.reduce((s, a) => {
-    const fields = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4'];
-    return s + fields.reduce((s2, k) => s2 + (Number(a[k]) || 0), 0);
-  }, 0);
-  const miles       = p.audits.reduce((s, a) => s + (Number(a.mileage) || 0), 0);
-  const mileagePay  = miles * MILEAGE;
+  // NOTE: the list view uses total_pay, while this view uses
+  // auditor_pay_per_audit + holiday_pay. Left as-is; check this is intended.
+  const earnings = sumBy(p.audits, a => num(a.auditor_pay_per_audit));
+  const holidayPay = sumBy(p.audits, a => num(a.holiday_pay));
+  const expenses = sumBy(p.audits, expensesOf);
+  const miles = sumBy(p.audits, a => num(a.mileage));
 
-  document.getElementById('modal-title').textContent    = fmt(p.periodStart) + ' - ' + fmt(p.periodEnd);
-  document.getElementById('modal-subtitle').textContent = 'Pay date: ' + fmt(p.payDate);
+  const breakdown = p.audits.map(a => `
+    <div class="modal-field full">
+      <div class="modal-field-label">${esc(a.site_name)} \u00b7 ${esc(a.internal_id)}</div>
+      <div style="display:flex;gap:1rem;margin-top:4px;flex-wrap:wrap">
+        <span class="modal-field-value green">Pay: ${money(a.total_pay)}</span>
+        <span class="modal-field-value" style="color:var(--nord9)">Expenses: ${money(expensesOf(a))}</span>
+        <span class="modal-field-value" style="color:var(--nord9)">Mileage: ${money(num(a.mileage) * MILEAGE)}</span>
+        <span class="modal-field-value" style="color:var(--nord3);font-size:11px">${fmtDate(a.approval_date)}</span>
+      </div>
+    </div>`).join('');
 
-  document.getElementById('modal-body').innerHTML = `
-    <div class="modal-field">
-      <div class="modal-field-label">Base pay</div>
-      <div class="modal-field-value mono green">\u00a3${earnings.toFixed(2)}</div>
-    </div>
-    <div class="modal-field">
-      <div class="modal-field-label">Inc. holiday pay</div>
-      <div class="modal-field-value mono green">\u00a3${(earnings + holidayPay).toFixed(2)}</div>
-    </div>
-    <div class="modal-field">
-      <div class="modal-field-label">Expenses</div>
-      <div class="modal-field-value mono" style="color:var(--nord9)">\u00a3${expenses.toFixed(2)}</div>
-    </div>
-    <div class="modal-field">
-      <div class="modal-field-label">Mileage (${miles.toFixed(1)} mi)</div>
-      <div class="modal-field-value mono" style="color:var(--nord9)">\u00a3${mileagePay.toFixed(2)}</div>
-    </div>
+  $('modal-title').textContent = `${fmtDate(p.periodStart)} - ${fmtDate(p.periodEnd)}`;
+  $('modal-subtitle').textContent = 'Pay date: ' + fmtDate(p.payDate);
+  $('modal-body').innerHTML = `
+    ${modalField('Base pay', money(earnings), { valueClass: 'modal-field-value mono green' })}
+    ${modalField('Inc. holiday pay', money(earnings + holidayPay), { valueClass: 'modal-field-value mono green' })}
+    ${modalField('Expenses', money(expenses), { valueClass: 'modal-field-value mono' })}
+    ${modalField(`Mileage (${miles.toFixed(1)} mi)`, money(miles * MILEAGE), { valueClass: 'modal-field-value mono' })}
 
     <div class="modal-field full" style="background:none;border-color:var(--nord2);border-style:dashed">
       <div class="modal-field-label">Breakdown</div>
     </div>
-
-    ${p.audits.map(a => {
-      const exp = ['reclaimable_expenses', 'reclaimable_expenses_2', 'reclaimable_expenses_3', 'reclaimable_expenses_4']
-        .reduce((s, k) => s + (Number(a[k]) || 0), 0);
-      const mi  = (Number(a.mileage) || 0) * MILEAGE;
-      return `
-        <div class="modal-field full">
-          <div class="modal-field-label">${a.site_name} \u00b7 ${a.internal_id}</div>
-          <div style="display:flex;gap:1rem;margin-top:4px;flex-wrap:wrap">
-            <span class="modal-field-value green">Pay: \u00a3${Number(a.total_pay || 0).toFixed(2)}</span>
-            <span class="modal-field-value" style="color:var(--nord9)">Expenses: \u00a3${exp.toFixed(2)}</span>
-            <span class="modal-field-value" style="color:var(--nord9)">Mileage: \u00a3${mi.toFixed(2)}</span>
-            <span class="modal-field-value" style="color:var(--nord3);font-size:11px">${fmt(new Date(a.approval_date))}</span>
-          </div>
-        </div>
-      `;
-    }).join('')}
+    ${breakdown}
   `;
 
-  document.getElementById('modal-backdrop').classList.add('open');
+  $('modal-backdrop').classList.add('open');
 }
 
-  function selectRoute(type) {
-    selectedRoute = type;
-    document.getElementById('btn-nn').classList.toggle('active', type === 'nearest');
-    document.getElementById('btn-bf').classList.toggle('active', type === 'brute');
-  }
+/* ========================================================================
+ * 8. View responses
+ * ====================================================================== */
 
-  async function fetchRoute() {
-    var selectedStops = getSelectedStops();
-    if(selectedStops.length < 1){
-      alert("No audits selected");
-      return;
-    }
-    const btn = document.getElementById('fetch-btn');
-    const container = document.getElementById('route-links');
-    const errEl = document.getElementById('route-error');
-    btn.disabled = true;
-    btn.textContent = 'Generating...';
-    errEl.textContent = '';
-    container.innerHTML = '<div class="route-empty">Calculating...</div>';
-    homeValue = dropdownState.address;
-    selectedRoute = dropdownState.route;
-    
-    
-    let requestBody = JSON.stringify(selectedStops);
-    console.log(requestBody);
+function getAuditSubmissionDate(a) {
+  return a.submission_date || a.submitted_date || a.approval_date || null;
+}
 
-    
-    try {
-      // route stays on local C++ server - this is where the algorithm lives
-      const res = await fetch(`/api/route?type=${selectedRoute}&address=${homeValue}`, {
-        method: 'POST',                                   
-        headers: { 
-            'Authorization': sessionStorage.getItem('bearer') || '',
-            'Content-Type': 'application/json'             
-        },
-        body: requestBody                                 
-    });
-    
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || 'Failed');
-      const links = data.links || [];
-      const report = data.report;
-      downloadSelectedStopsAsText(report);
-      if (links.length === 0) { container.innerHTML = '<div class="route-empty">No routes returned.</div>'; return; }
-      container.innerHTML = links.map((url, i) => `
-        <div class="route-link-item">
-          <span class="route-link-num">${String(i + 1).padStart(2, '0')}</span>
-          <a class="route-link-url" href="${url}" target="_blank" rel="noopener">${url}</a>
-        </div>
-      `).join('');
-    } catch (e) {
-      container.innerHTML = '<div class="route-empty">No routes to display.</div>';
-      errEl.textContent = e.message;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Generate route';
-    }
-
-    
-  }
-
-  
-
-  function loadNotes() {
-    //functionality for the notes here
-  }
-
-  function clearNote(i) { document.getElementById('note-' + i).value = ''; }
-  function suggestNote(i, siteName, visitType) {
-    document.getElementById('note-' + i).value =
-      `Audit conducted at ${siteName}. Visit type: ${visitType}. All areas inspected in accordance with required standards. No significant issues identified at time of visit. Documentation reviewed and found to be in order.`;
-  }
-
-  function doLogout() {
-    sessionStorage.removeItem('bearer');
-    auditCache = [];
-    payslipData = null;
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('dashboard-screen').style.display = 'none';
-    document.getElementById('usr').value = '';
-    document.getElementById('pwd').value = '';
-    document.getElementById('stat-pending').textContent = '-';
-    document.getElementById('stat-holiday').textContent = '-';
-    document.getElementById('stat-count').textContent = '-';
-    document.getElementById('audit-tbody').innerHTML = '<tr><td colspan="4" class="table-empty">Loading...</td></tr>';
-    document.getElementById('route-links').innerHTML = '<div class="route-empty">Select a method and generate a route.</div>';
-    navigate('home');
-  }
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModalDirect();
-    if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin();
+function buildResponseIndexes(items) {
+  state.responseById = new Map();
+  state.responseRows = items.map(a => {
+    if (a.internal_id) state.responseById.set(String(a.internal_id).toLowerCase(), a);
+    if (a.order_internal_id) state.responseById.set(String(a.order_internal_id).toLowerCase(), a);
+    return {
+      audit: a,
+      searchText: [a.site_name, a.internal_id, a.order_internal_id, a.client_name]
+        .filter(Boolean).join(' ').toLowerCase(),
+      submissionDate: getAuditSubmissionDate(a),
+    };
   });
+}
 
-  function buildResponseIndexes(items) {
-    responseById = new Map();
-
-    responseSearchRows = items.map(a => {
-      if (a.internal_id) responseById.set(String(a.internal_id).toLowerCase(), a);
-      if (a.order_internal_id) responseById.set(String(a.order_internal_id).toLowerCase(), a);
-
-      return {
-        audit: a,
-        searchText: [
-          a.site_name,
-          a.internal_id,
-          a.order_internal_id,
-          a.client_name
-        ].filter(Boolean).join(' ').toLowerCase(),
-        submissionDate: getAuditSubmissionDate(a)
-      };
-    });
-  }
-
-  function getAuditSubmissionDate(a) {
-    return a.submission_date
-        || a.submitted_date
-        || a.approval_date
-        || null;
-  }
-
-
-  async function loadViewResponses() {
-  const container = document.getElementById('view-responses-container');
-  container.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Loading...</div>';
-
+async function loadViewResponses() {
+  const container = $('view-responses-container');
+  container.innerHTML = loadingHtml();
   try {
-    await getApprovedAuditData();
+    await getCompletedAudits();
     renderViewResponses();
   } catch (e) {
-    container.innerHTML = '<div style="font-size:13px;color:var(--nord3)">Could not load responses.</div>';
+    container.innerHTML = loadingHtml('Could not load responses.');
   }
 }
-  function applyResponseFilters() {
-    const query = document.getElementById('response-search').value.trim().toLowerCase();
-    const fromValue = document.getElementById('response-from').value;
-    const toValue = document.getElementById('response-to').value;
 
-    const from = fromValue ? new Date(fromValue + 'T00:00:00') : null;
-    const to = toValue ? new Date(toValue + 'T23:59:59') : null;
+function renderViewResponses() {
+  $('view-responses-container').innerHTML = `
+    <div class="response-toolbar">
+      <input id="response-search" class="response-input" placeholder="Search name or audit ID" />
+      <span class="field-label">From</span>
+      <input id="response-from" class="response-input" type="date" />
+      <span class="field-label">To</span>
+      <input id="response-to" class="response-input" type="date" />
+      <button class="info-btn" onclick="clearResponseFilters()">Clear</button>
+    </div>
+    <div id="response-results"></div>
+  `;
 
-    let rows = responseSearchRows;
+  $('response-search').addEventListener('input', applyResponseFilters);
+  $('response-from').addEventListener('change', applyResponseFilters);
+  $('response-to').addEventListener('change', applyResponseFilters);
 
-    if (query) {
-      const exact = responseById.get(query);
-      rows = exact
-        ? [{ audit: exact, searchText: '', submissionDate: getAuditSubmissionDate(exact) }]
-        : rows.filter(row => row.searchText.includes(query));
-    }
+  applyResponseFilters();
+}
 
-    rows = rows.filter(row => {
-      if (!row.submissionDate) return !from && !to;
+function clearResponseFilters() {
+  $('response-search').value = '';
+  $('response-from').value = '';
+  $('response-to').value = '';
+  applyResponseFilters();
+}
 
-      const date = new Date(row.submissionDate);
-      if (from && date < from) return false;
-      if (to && date > to) return false;
-      return true;
+function applyResponseFilters() {
+  const query = $('response-search').value.trim().toLowerCase();
+  const fromValue = $('response-from').value;
+  const toValue = $('response-to').value;
+  const from = fromValue ? new Date(fromValue + 'T00:00:00') : null;
+  const to = toValue ? new Date(toValue + 'T23:59:59') : null;
+
+  let rows = state.responseRows;
+
+  if (query) {
+    const exact = state.responseById.get(query);
+    rows = exact
+      ? [{ audit: exact, searchText: '', submissionDate: getAuditSubmissionDate(exact) }]
+      : rows.filter(row => row.searchText.includes(query));
+  }
+
+  rows = rows.filter(row => {
+    if (!row.submissionDate) return !from && !to;
+    const date = new Date(row.submissionDate);
+    if (from && date < from) return false;
+    if (to && date > to) return false;
+    return true;
+  });
+
+  renderResponseResults(rows);
+}
+
+function renderResponseResults(rows) {
+  const results = $('response-results');
+
+  if (rows.length === 0) {
+    results.innerHTML = '<div class="table-empty">No responses found.</div>';
+    return;
+  }
+
+  results.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Audit</th>
+            <th>Audit ID</th>
+            <th>Submission date</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(({ audit: a }) => {
+            const id = a.internal_id || a.order_internal_id || '';
+            const submitted = getAuditSubmissionDate(a);
+            return `
+              <tr>
+                <td data-label="Audit">
+                  <div class="tbl-primary">${esc(a.site_name)}</div>
+                  <div class="tbl-secondary">${esc(a.client_name)}</div>
+                </td>
+                <td data-label="Audit ID" class="pay-cell">${esc(id)}</td>
+                <td data-label="Submission date">${submitted ? fmtDate(submitted) : '-'}</td>
+                <td data-label="Status">${esc(a.status)}</td>
+                <td><button class="info-btn" data-action="response-detail" data-id="${esc(id)}">View</button></td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function showAuditDetailFromResponse(auditId) {
+  const audit = (state.completed || []).find(a =>
+    String(a.internal_id) === String(auditId) ||
+    String(a.order_internal_id) === String(auditId));
+
+  if (!audit) {
+    alert('Audit not found.');
+    return;
+  }
+  openAuditModal(audit, { showResponses: true });
+}
+
+/* ========================================================================
+ * 9. Routes
+ * ====================================================================== */
+
+const routeTbody = () => document.querySelector('#route-stops-table tbody');
+const selectAllBox = () => $('select-all-checkbox');
+
+function loadRoutes() {
+  renderRouteStopsTable();
+}
+
+function renderRouteStopsTable() {
+  const tbody = routeTbody();
+  if (!tbody) return;
+
+  // Reset the master checkbox: freshly rendered rows start unchecked.
+  const master = selectAllBox();
+  if (master) {
+    master.checked = false;
+    master.indeterminate = false;
+  }
+
+  if (state.assigned.length === 0) {
+    tbody.innerHTML = emptyRow(5, 'No audits available.');
+    return;
+  }
+
+  tbody.innerHTML = state.assigned.map((a, index) => `
+    <tr>
+      <td style="text-align: center;" data-label="Select">
+        <input type="checkbox" class="row-checkbox" data-index="${index}" style="accent-color: var(--nord10); cursor: pointer;">
+      </td>
+      <td data-label="Audit name">
+        <div class="tbl-primary">${esc(a.site_name)}</div>
+        <div class="tbl-secondary">${esc(a.client_name)}</div>
+      </td>
+      <td data-label="Audit ID" class="pay-cell">${esc(a.internal_id || a.order_internal_id)}</td>
+      <td data-label="Deadline"><span class="deadline-badge">${fmtDate(a.deadline_date)}</span></td>
+      <td data-label="Action" style="text-align: right;">
+        <button class="info-btn" data-action="assigned-detail" data-index="${index}">Details</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// Bound once in init; uses delegation so re-rendering rows needs no re-binding.
+function initRouteTable() {
+  const tbody = routeTbody();
+  const master = selectAllBox();
+  if (!tbody || !master) return;
+
+  tbody.addEventListener('change', e => {
+    if (!e.target.classList.contains('row-checkbox')) return;
+    e.target.closest('tr').style.background = e.target.checked ? 'var(--nord2)' : '';
+    updateSelectAllState();
+  });
+
+  master.addEventListener('change', () => {
+    tbody.querySelectorAll('.row-checkbox').forEach(cb => {
+      cb.checked = master.checked;
+      cb.closest('tr').style.background = master.checked ? 'var(--nord2)' : '';
+    });
+  });
+}
+
+function updateSelectAllState() {
+  const boxes = Array.from(routeTbody().querySelectorAll('.row-checkbox'));
+  const master = selectAllBox();
+  const checked = boxes.filter(cb => cb.checked).length;
+  master.checked = boxes.length > 0 && checked === boxes.length;
+  master.indeterminate = checked > 0 && checked < boxes.length;
+}
+
+function getSelectedStops() {
+  const boxes = routeTbody().querySelectorAll('.row-checkbox:checked');
+  return Array.from(boxes)
+    .map(cb => state.assigned[Number(cb.dataset.index)])
+    .filter(Boolean);
+}
+
+async function fetchRoute() {
+  const stops = getSelectedStops();
+  if (stops.length < 1) {
+    alert('No audits selected');
+    return;
+  }
+
+  const btn = $('fetch-btn');
+  const container = $('route-links');
+  const errEl = $('route-error');
+
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  errEl.textContent = '';
+  container.innerHTML = '<div class="route-empty">Calculating...</div>';
+  state.lastRouteReport = null;
+
+  const type = encodeURIComponent(dropdownState.route);
+  const address = encodeURIComponent(dropdownState.address);
+
+  try {
+    // The routing algorithm lives on the local C++ server.
+    const res = await fetch(`/api/route?type=${type}&address=${address}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': sessionStorage.getItem('bearer') || '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(stops),
     });
 
-    renderResponseResults(rows);
-  }
-  
-  function renderViewResponses() {
-    const container = document.getElementById('view-responses-container');
+    if (res.status === 401) {
+      doLogout();
+      throw new Error('Session expired. Please sign in again.');
+    }
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Failed');
 
-    container.innerHTML = `
-      <div class="response-toolbar">
-        <input id="response-search" class="response-input" placeholder="Search name or audit ID" />
-        <span class="field-label">From</span>
-        <input id="response-from" class="response-input" type="date" />
-        <span class="field-label">To</span>
-        <input id="response-to" class="response-input" type="date" />
-        <button class="info-btn" onclick="clearResponseFilters()">Clear</button>
-      </div>
-      <div id="response-results"></div>
-    `;
+    const links = data.links || [];
+    state.lastRouteReport = data.report || null;
 
-    document.getElementById('response-search').addEventListener('input', applyResponseFilters);
-    document.getElementById('response-from').addEventListener('change', applyResponseFilters);
-    document.getElementById('response-to').addEventListener('change', applyResponseFilters);
-
-    applyResponseFilters();
-  }
-
-  function renderResponseResults(rows) {
-    const results = document.getElementById('response-results');
-
-    if (rows.length === 0) {
-      results.innerHTML = '<div class="table-empty">No responses found.</div>';
+    if (links.length === 0) {
+      container.innerHTML = '<div class="route-empty">No routes returned.</div>';
       return;
     }
 
-    const fmt = d => new Date(d).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-
-    results.innerHTML = `
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Audit</th>
-              <th>Audit ID</th>
-              <th>Submission date</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows.map(row => {
-              const a = row.audit;
-              const submitted = getAuditSubmissionDate(a);
-
-              return `
-                <tr>
-                  <td data-label="Audit">
-                    <div class="tbl-primary">${a.site_name || ''}</div>
-                    <div class="tbl-secondary">${a.client_name || ''}</div>
-                  </td>
-                  <td data-label="Audit ID" class="pay-cell">${a.internal_id || a.order_internal_id || ''}</td>
-                  <td data-label="Submission date">${submitted ? fmt(submitted) : '-'}</td>
-                  <td data-label="Status">${a.status || ''}</td>
-                  <td><button class="info-btn" onclick="showAuditDetailFromResponse('${a.internal_id || a.order_internal_id}')">View</button></td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
+    container.innerHTML = links.map((url, i) => `
+      <div class="route-link-item">
+        <span class="route-link-num">${String(i + 1).padStart(2, '0')}</span>
+        <a class="route-link-url" href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a>
       </div>
-    `;
+    `).join('') + (state.lastRouteReport
+      ? '<div style="margin-top:12px"><button class="info-btn" data-action="download-report">Download stop list</button></div>'
+      : '');
+  } catch (e) {
+    container.innerHTML = '<div class="route-empty">No routes to display.</div>';
+    errEl.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate route';
   }
-  function showAuditDetailFromResponse(auditID) {
-    //We need to get the index of the audit in the main cache to reuse the existing detail modal
-    const auditObj = completedCache.find(a => 
-      String(a.internal_id) === String(auditID) || 
-      String(a.order_internal_id) === String(auditID)
-    );
-    //console.log(completedCache.length);
-    if (!auditObj) {
-      alert('Audit not found in cache.');
-      return;
-    }
-    //console.log(JSON.stringify(auditObj));
-    showAuditDetail(auditObj, true, true, auditObj);
-    //a.survey_answers contains what we are looking for
-    //find format we used for view audits
-    
+}
 
-  }
+function downloadRouteReport() {
+  if (!state.lastRouteReport) return;
 
-  //dropdown functionality 
+  const blob = new Blob([state.lastRouteReport], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'audit-route-stops.txt';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
+/* ========================================================================
+ * 10. Dropdowns
+ * ====================================================================== */
 
-const dropdownState = { route: 'brute', address: 'home' };
+function closeAllDropdowns() {
+  document.querySelectorAll('.cd-list').forEach(l => l.classList.remove('open'));
+  document.querySelectorAll('.cd-trigger').forEach(t => t.classList.remove('open'));
+}
 
 function makeDropdown(triggerId, listId, labelId, stateKey) {
-  const trigger = document.getElementById(triggerId);
-  const list = document.getElementById(listId);
-  const label = document.getElementById(labelId);
+  const trigger = $(triggerId);
+  const list = $(listId);
+  const label = $(labelId);
+  if (!trigger || !list || !label) return;
   const options = list.querySelectorAll('.cd-option');
 
-  trigger.addEventListener('click', (e) => {
+  trigger.addEventListener('click', e => {
     e.stopPropagation();
-    const isOpen = list.classList.contains('open');
-    document.querySelectorAll('.cd-list').forEach(l => l.classList.remove('open'));
-    document.querySelectorAll('.cd-trigger').forEach(t => t.classList.remove('open'));
-    if (!isOpen) {
+    const wasOpen = list.classList.contains('open');
+    closeAllDropdowns();
+    if (!wasOpen) {
       list.classList.add('open');
       trigger.classList.add('open');
     }
@@ -677,140 +823,45 @@ function makeDropdown(triggerId, listId, labelId, stateKey) {
       opt.classList.add('selected');
       label.textContent = opt.textContent;
       dropdownState[stateKey] = opt.dataset.value;
-      list.classList.remove('open');
-      trigger.classList.remove('open');
+      closeAllDropdowns();
     });
   });
 }
-//make sure its loaded after the DOM is ready
+
+/* ========================================================================
+ * 11. Init
+ * ====================================================================== */
+
+// One delegated handler for every generated button.
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+
+  switch (el.dataset.action) {
+    case 'assigned-detail':
+      openAuditModal(state.assigned[Number(el.dataset.index)]);
+      break;
+    case 'payslip-detail':
+      showPayslipDetail(Number(el.dataset.index));
+      break;
+    case 'response-detail':
+      showAuditDetailFromResponse(el.dataset.id);
+      break;
+    case 'download-report':
+      downloadRouteReport();
+      break;
+  }
+});
+
+document.addEventListener('click', closeAllDropdowns);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModalDirect();
+  if (e.key === 'Enter' && $('login-screen').style.display !== 'none') doLogin();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   makeDropdown('cd-route-trigger', 'cd-route-list', 'cd-route-label', 'route');
   makeDropdown('cd-addr-trigger', 'cd-addr-list', 'cd-addr-label', 'address');
+  initRouteTable();
 });
-document.addEventListener('click', () => {
-  document.querySelectorAll('.cd-list').forEach(l => l.classList.remove('open'));
-  document.querySelectorAll('.cd-trigger').forEach(t => t.classList.remove('open'));
-});
-
-
-
-const tbody = document.querySelector('#route-stops-table tbody');
-const selectAllCheckbox = document.getElementById('select-all-checkbox');
-function loadRoutes(){
-  //load all audit data from "auditCache" and fill out the table.
-  renderRouteStopsTable();
-}
-function renderRouteStopsTable() {
-    const tbody = document.querySelector('#route-stops-table tbody');
-    if (!tbody) return;
-
-    if (!auditCache || auditCache.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No audits available.</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = auditCache.map((a, index) => {
-        const deadline = new Date(a.deadline_date);
-        const deadlineStr = deadline.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-        
-        return `
-            <tr>
-                <td style="text-align: center;" data-label="Select">
-                    <input type="checkbox" class="row-checkbox" data-index="${index}" style="accent-color: var(--nord10); cursor: pointer;">
-                </td>
-                <td data-label="Audit name">
-                    <div class="tbl-primary">${a.site_name || ''}</div>
-                    <div class="tbl-secondary">${a.client_name || ''}</div>
-                </td>
-                <td data-label="Audit ID" class="pay-cell">${a.internal_id || a.order_internal_id || ''}</td>
-                <td data-label="Deadline"><span class="deadline-badge">${deadlineStr}</span></td>
-                <td data-label="Action" style="text-align: right;">
-                    <button class="info-btn" onclick="showAuditDetail(${index})">Details</button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-
-    tbody.addEventListener('change', function(e) {
-    if (e.target.classList.contains('row-checkbox')) {
-        const row = e.target.closest('tr');
-        if (e.target.checked) {
-            row.style.background = 'var(--nord2)'; // Matches your hover/active highlight styling
-        } else {
-            row.style.background = '';
-        }
-        updateSelectAllState();
-    }
-    });
-
-    // 3. Handle Master "Select All" Checkbox
-    selectAllCheckbox.addEventListener('change', function() {
-        const isChecked = selectAllCheckbox.checked;
-        const rowCheckboxes = tbody.querySelectorAll('.row-checkbox');
-
-        rowCheckboxes.forEach(checkbox => {
-            checkbox.checked = isChecked;
-            const row = checkbox.closest('tr');
-            row.style.background = isChecked ? 'var(--nord2)' : '';
-        });
-    });
-}
-function getSelectedStops(){
-  const checkedBoxes = tbody.querySelectorAll('.row-checkbox:checked');
-    return Array.from(checkedBoxes).map(cb => {
-        const index = cb.getAttribute('data-index');
-        return auditCache[index];
-    });
-}
-function updateSelectAllState() {
-    const rowCheckboxes = tbody.querySelectorAll('.row-checkbox');
-    if (rowCheckboxes.length === 0) {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = false;
-        return;
-    }
-
-    const allChecked = Array.from(rowCheckboxes).every(cb => cb.checked);
-    const someChecked = Array.from(rowCheckboxes).some(cb => cb.checked);
-
-    if (allChecked) {
-        selectAllCheckbox.checked = true;
-        selectAllCheckbox.indeterminate = false;
-    } else if (someChecked) {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = true; // Displays the professional dash state
-    } else {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = false;
-    }
-}
-
-function downloadSelectedStopsAsText(fileContent) {
-    // 1. Gather the selected stops from your table
-    const checkedBoxes = document.querySelectorAll('#route-stops-table .row-checkbox:checked');
-    const selectedStops = Array.from(checkedBoxes).map(cb => {
-        const index = cb.getAttribute('data-index');
-        return auditCache[index]; // Pulls the audit object from your cache[cite: 2]
-    });
-
-    if (selectedStops.length === 0) {
-        alert("Please select at least one audit stop to export.");
-        return;
-    }
-
-   
-    // 3. Create a Blob and trigger the download
-    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'audit-route-stops.txt'; // Name of the downloaded file
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up memory
-    URL.revokeObjectURL(url);
-}

@@ -68,10 +68,10 @@ void Dashboard::registerRoutes() {
         res.set_header("Access-Control-Allow-Origin", "*");
         try {
             std::string type = req.get_param_value("type");
-            std::cout << req.body;
+            
 
             json data = json::parse(req.body);
-            std::cout << data;
+            
             RouteType route;
             if(type == "brute") route = RouteType::BRUTE_FORCE;
             else if(type=="heldkarp") route = RouteType::HELD_KARP;

@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="E:\__________UNI\Audits\AuditDashboard\Route\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\__________UNI\Audits\AuditDashboard\Route\ApiClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\__________UNI\Audits\AuditDashboard\Route\Dashboard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\__________UNI\Audits\AuditDashboard\Route\Utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\__________UNI\Audits\AuditDashboard\Route\HeldKarp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="E:\__________UNI\Audits\AuditDashboard\Route\ApiClient.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="E:\__________UNI\Audits\AuditDashboard\Route\Dashboard.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="E:\__________UNI\Audits\AuditDashboard\Route\json.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="E:\__________UNI\Audits\AuditDashboard\Route\httplib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="E:\__________UNI\Audits\AuditDashboard\Route\Utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="E:\__________UNI\Audits\AuditDashboard\Route\DistanceMatrix.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="E:\__________UNI\Audits\AuditDashboard\Route\HeldKarp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="E:\__________UNI\Audits\AuditDashboard\Route\Audit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="E:\__________UNI\Audits\AuditDashboard\Route\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{9FA8E95E-678E-37FD-A398-0B2E5E9EC590}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{CAA6DAE2-06AA-3C67-8780-A6E43EEA3F78}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

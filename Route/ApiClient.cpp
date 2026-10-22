@@ -10,7 +10,7 @@
 #endif
 
 const float HOLIDAY_PAY = 1.12f;
-const std::string OPENROUTE_API = "";
+const std::string OPENROUTE_API = Utils::Utils::getEnv("OPENROUTE_API"); 
 
 ApiClient::ApiClient(const std::string& host)
     : cli(host)

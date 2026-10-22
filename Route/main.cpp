@@ -4,7 +4,7 @@
 using namespace std;
 
 int main() {
-
+    Utils::Utils::loadDotEnv(); 
     ApiClient apiClient("www.secure-servelegal.co.uk");
     Dashboard dashboard(apiClient);
     

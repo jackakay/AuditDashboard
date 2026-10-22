@@ -100,7 +100,8 @@ std::vector<Audit> ApiClient::getRoute(const RouteType route, const std::string&
 
     
     // add the start location as the first element in the list of coordinates
-    std::cout << "Audit locations succesfully found.\n";
+    
+
 
     std::vector<Audit> auditRoute = json::parse(j);
     auditRoute.insert(auditRoute.begin(), getStartingLocation(bearerToken, addressType));
@@ -228,8 +229,7 @@ json ApiClient::getDistanceMatrix(const json& body) const {
     };
     
     auto res = cli.Post("/v2/matrix/driving-car", headers, body.dump(), "application/json");
-    std::cout << body.dump() << std::endl;
-    std::cout << res << std::endl;
+    
     if (!res || res->status != 200) {
         std::cerr << "Failed to get distance matrix\n";
         return {};
@@ -268,7 +268,7 @@ CognitoTokens ApiClient::authenticate(const std::string& username, const std::st
     if (j.contains("error")) {
         throw std::runtime_error("Auth error: " + j["error"].get<std::string>());
     }
-    std::cout << j["access_token"].get<std::string>() << "\n";
+    
     return CognitoTokens{
         j["access_token"],
         j["id_token"],
@@ -292,13 +292,13 @@ Audit ApiClient::getStartingLocation(const std::string& bearerToken, Address add
     if(addressType == Address::TERM){
         double lat = j["term_coordinates"]["lat"].get<double>();
         double lng = j["term_coordinates"]["lng"].get<double>();
-        std::cout << "Term coordinates: " << lat << ", " << lng << "\n";
+        
         Audit a = {.site_name = "Term address", .coords = {lng, lat}};
         return a;
     }
     double lat = j["home_coordinates"]["lat"].get<double>();
     double lng = j["home_coordinates"]["lng"].get<double>();
-    std::cout << "Home coordinates: " << lat << ", " << lng << "\n";
+    
     Audit a = {.site_name = "Home address", .coords = {lng, lat}};
     return a;
 }

@@ -8,6 +8,7 @@
 #include "DistanceMatrix.h"
 #include "HeldKarp.h"
 #include "Audit.h"
+#include "Utils.h"
 
 
 using json = nlohmann::json;

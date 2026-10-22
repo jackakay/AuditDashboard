@@ -11,8 +11,12 @@ namespace Utils {
         std::string username;
         std::string password;
     };
-
-    std::string readBearerToken(const std::string& filename);
-    UserCredentials getUserCredentials();
+    class Utils {
+        public:
+            static std::string readBearerToken(const std::string& filename);
+            static UserCredentials getUserCredentials();
+            static std::string getEnv(const std::string& name);
+            static inline void loadDotEnv(const std::string& path = ".env");
+    };
     
 }

@@ -15,13 +15,17 @@ add_executable(WebServer
     ApiClient.h
     Dashboard.cpp
     Dashboard.h
-    json.hpp
-    httplib.h
+    utils/json.hpp
+    utils/httplib.h
     Utils.cpp
     Utils.h
-    DistanceMatrix.h
-    HeldKarp.cpp
-    HeldKarp.h
+    DistanceMatrix.h 
+    route_methods/BruteForce.cpp
+    route_methods/BruteForce.h
+    route_methods/HeldKarp.cpp
+    route_methods/HeldKarp.h
+    route_methods/NearestNeighbour.cpp
+    route_methods/NearestNeighbour.h
     Audit.h
 
 )

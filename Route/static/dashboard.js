@@ -721,6 +721,13 @@ async function fetchRoute() {
     return;
   }
 
+  const type = encodeURIComponent(dropdownState.route);
+  const address = encodeURIComponent(dropdownState.address);
+
+  if((type === 'heldkarp' || type === 'brute') && stops.length > 18 ) {
+    alert('Held-Karp algorithm is limited to 18 stops. Please select fewer audits, choose a different method, or host on your own machine.');
+    return;
+  }
   const btn = $('fetch-btn');
   const container = $('route-links');
   const errEl = $('route-error');
@@ -731,8 +738,7 @@ async function fetchRoute() {
   container.innerHTML = '<div class="route-empty">Calculating...</div>';
   state.lastRouteReport = null;
 
-  const type = encodeURIComponent(dropdownState.route);
-  const address = encodeURIComponent(dropdownState.address);
+  
 
   try {
     // The routing algorithm lives on the local C++ server.
@@ -813,7 +819,7 @@ function makeDropdown(triggerId, listId, labelId, stateKey) {
     initial.classList.add('selected');
     label.textContent = initial.textContent;
   }
-  
+
   trigger.addEventListener('click', e => {
     e.stopPropagation();
     const wasOpen = list.classList.contains('open');

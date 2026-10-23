@@ -2,15 +2,15 @@
 
 
 // Takes a DistanceMatrix object, and outputs the fastest route.
-std::vector<Audit> HeldKarp::solve(DistanceMatrix m, std::vector<Audit> audits){ // guarantees optimality
-    int n = m.size();
+std::vector<Audit> HeldKarp::solve(const DistanceMatrix& dist, const std::vector<Audit>& audits){ // guarantees optimality
+    int n = dist.size();
     if (n <= 1) return {};
     
     const double INF = std::numeric_limits<double>::infinity();
 
     if (n == 2) {
-        double t1 = m.getTime(0, 1);
-        double t2 = m.getTime(1, 0);
+        double t1 = dist.getTime(0, 1);
+        double t2 = dist.getTime(1, 0);
         if (t1 == INF || t2 == INF) return {};
         return {audits[0], audits[1], audits[0]};
     }
@@ -35,7 +35,7 @@ std::vector<Audit> HeldKarp::solve(DistanceMatrix m, std::vector<Audit> audits){
             // Try moving to a next unvisited city 'v'
             for (int v = 0; v < n; ++v) {
                 if (!(mask & (1 << v))) {
-                    double travelTime = m.getTime(u, v);
+                    double travelTime = dist.getTime(u, v);
                     if (travelTime == INF) continue;
 
                     int next_mask = mask | (1 << v);
@@ -56,7 +56,7 @@ std::vector<Audit> HeldKarp::solve(DistanceMatrix m, std::vector<Audit> audits){
     int last_city = -1;
 
     for (int u = 1; u < n; ++u) {
-        double returnTime = m.getTime(u, 0);
+        double returnTime = dist.getTime(u, 0);
         if (memo[final_mask][u] == INF || returnTime == INF) continue;
 
         double totalTime = memo[final_mask][u] + returnTime;
@@ -83,16 +83,16 @@ std::vector<Audit> HeldKarp::solve(DistanceMatrix m, std::vector<Audit> audits){
     bestPathIndices.push_back(0); // Add start
     std::reverse(bestPathIndices.begin(), bestPathIndices.end());
 
-    // Map the winning indices back to coordinates using m
+    // Map the winning indices back to coordinates using dist
     std::vector<std::pair<double, double>> bestRouteCoords;
     std::vector<Audit> bestRoute;
     
     for (int idx : bestPathIndices) {
-        bestRouteCoords.push_back(m.getCoords(idx));
+        bestRouteCoords.push_back(dist.getCoords(idx));
         bestRoute.push_back(audits[idx]);
     }
     // Complete the loop back to start
-    bestRouteCoords.push_back(m.getCoords(0));
+    bestRouteCoords.push_back(dist.getCoords(0));
     bestRoute.push_back(audits[0]);
 
     return bestRoute;

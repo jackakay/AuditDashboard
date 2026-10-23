@@ -6,10 +6,13 @@ Dashboard::Dashboard(ApiClient& client) : apiClient(client) {
 }
 
 void Dashboard::start(int port) {
-    std::cout << "Dashboard running at http://localhost:" << port << "\n";
     const char* port_env = std::getenv("PORT");
-    int portFromEnv = port_env ? std::stoi(port_env) : port;
-    svr.listen("0.0.0.0", portFromEnv);
+    int listenPort = port_env ? std::stoi(port_env) : port;
+
+    std::cerr << "Listening on localhost   :" << listenPort << std::endl;  // flushes
+    if (!svr.listen("0.0.0.0", listenPort)) {
+        std::cerr << "Failed to bind to port " << listenPort << std::endl;
+    }
 }
 
 void Dashboard::registerRoutes() {

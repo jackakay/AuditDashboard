@@ -3,7 +3,7 @@
 #include <vector>
 #include <utility>
 #include <stdexcept>
-#include "json.hpp"
+#include "utils/json.hpp"
 
 class DistanceMatrix {
 private:

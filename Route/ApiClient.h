@@ -1,14 +1,19 @@
 #pragma once
-#include "httplib.h"
-#include "json.hpp"
+
 #include <string>
 #include <vector>
 #include <stdexcept>
 #include <cstdio>
+
+#include "utils/httplib.h"
+#include "utils/json.hpp"
 #include "DistanceMatrix.h"
-#include "HeldKarp.h"
 #include "Audit.h"
 #include "Utils.h"
+
+#include "route_methods/HeldKarp.h"
+#include "route_methods/NearestNeighbour.h"
+#include "route_methods/BruteForce.h"
 
 
 using json = nlohmann::json;
@@ -46,7 +51,7 @@ private:
     json convertCoordinatesToJson(const std::vector<Audit> audits) const;
     json getDistanceMatrix(const json& body) const;
     
-    std::vector<Audit> getBestRouteBruteForce(DistanceMatrix m, std::vector<Audit> audits) const;
+    
 
     std::string convertRouteToGoogleMapsLink(const std::vector<Audit>& route) const;
     std::string runPythonAuth(const std::string& username, const std::string& password) const;

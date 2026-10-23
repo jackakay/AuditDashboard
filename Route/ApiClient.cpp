@@ -92,17 +92,9 @@ std::vector<Audit> ApiClient::getRoute(const RouteType route, const std::string&
     if (bearerToken.empty()) throw std::runtime_error("Not authenticated");
     std::vector<std::string> links = { };
     int count{ 0 };
-    //for all we can just calculate the distance matrix. using distancematrix.ai we can work it all out from there
-    //to-do: need to figure out how big of an api request we can make, and figure out how to do it.
-
+    //for all we can just calculate the distance matrix. using openrouteservice we can work it all out from there
+   
     // i will be using this api https://openrouteservice.org/dev/#/api-docs
-
-
-    
-    // add the start location as the first element in the list of coordinates
-    
-
-
     std::vector<Audit> auditRoute = json::parse(j);
     auditRoute.insert(auditRoute.begin(), getStartingLocation(bearerToken, addressType));
 
@@ -113,19 +105,13 @@ std::vector<Audit> ApiClient::getRoute(const RouteType route, const std::string&
 
     switch (route) {
         case RouteType::NEAREST_NEIGHBOUR:
-            // ...
-            break;
+            return NearestNeighbour::solve(mat, auditRoute); //rarely optimal, much faster when held-karp gets slow.
         case RouteType::BRUTE_FORCE: {
-            // ...
-            //we compute the distance between each element, find the total time for all nodes, and repeat
-            // and keep finding the minimum between the current minimum, and the one we just worked out, until all permutations are complete.
-            //only really works < 10.
-
-            //We need to add a constant start/end point
-            
-            return getBestRouteBruteForce(mat, auditRoute);
+            //Only works well < 10 stops. There are better options
+            return BruteForce::solve(mat, auditRoute);
         }
         case RouteType::HELD_KARP: {
+            //best option for typical routes.
             return HeldKarp::solve(mat, auditRoute);
         }
         default:
@@ -135,79 +121,6 @@ std::vector<Audit> ApiClient::getRoute(const RouteType route, const std::string&
 
     return {};
 }
-
-std::vector<Audit> ApiClient::getBestRouteBruteForce(DistanceMatrix m, std::vector<Audit> audits) const {
-    // Index 0 is strictly reserved as the start and end
-    int numLocations = m.size();
-    if (numLocations <= 1) return {};
-
-    std::vector<int> middleStops(numLocations - 1);
-    std::iota(middleStops.begin(), middleStops.end(), 1); // Fills with 1, 2, ..., n-1
-
-    double minimumDuration = std::numeric_limits<double>::max();
-    std::vector<int> bestPathIndices;
-    const double INF = std::numeric_limits<double>::infinity();
-
-    // Brute-force through all possible middle stop permutations
-    do {
-        double currentDuration = 0.0;
-        bool validPath = true;
-
-        // A. Cost from Start (0) to the first middle stop
-        double firstLeg = m.getTime(0, middleStops[0]);
-        if (firstLeg == INF) continue;
-        currentDuration += firstLeg;
-
-        // B. Cost between all intermediate middle stops
-        for (size_t i = 0; i < middleStops.size() - 1; ++i) {
-            double leg = m.getTime(middleStops[i], middleStops[i + 1]);
-            if (leg == INF) {
-                validPath = false;
-                break;
-            }
-            currentDuration += leg;
-        }
-        if (!validPath) continue;
-
-        // C. Cost from the last middle stop back to Start (0)
-        double lastLeg = m.getTime(middleStops.back(), 0);
-        if (lastLeg == INF) continue;
-        currentDuration += lastLeg;
-
-        // Check if this permutation is the absolute fastest round trip
-        if (currentDuration < minimumDuration) {
-            minimumDuration = currentDuration;
-            bestPathIndices = middleStops;
-        }
-
-    } while (std::next_permutation(middleStops.begin(), middleStops.end()));
-
-    // If no valid loop could be completed
-    if (minimumDuration == INF) return {};
-
-    // 3. Reconstruct the final route coordinates using m's methods
-    std::vector<std::pair<double, double>> bestRouteCoords;
-    std::vector<Audit> bestRoute;
-    // Add Start Location
-    bestRouteCoords.push_back(m.getCoords(0));
-    bestRoute.push_back(audits[0]);
-
-    // Add winning middle stops in their optimal order
-    for (int idx : bestPathIndices) {
-        bestRouteCoords.push_back(m.getCoords(idx));
-        bestRoute.push_back(audits[idx]);
-    }
-
-    // Add End Location (same as Start)
-    bestRouteCoords.push_back(m.getCoords(0));
-    bestRoute.push_back(audits[0]);
-
-
-    //We could instead return a vector of the index of the audits?
-    return bestRoute;
-}
-
-
 
 json ApiClient::convertCoordinatesToJson(const std::vector<Audit> audits) const {
     json body;

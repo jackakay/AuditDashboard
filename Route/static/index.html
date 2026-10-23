@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/static/styles.css" />
+<script src="/static/api.js"></script>
+<script src="/static/dashboard.js"></script>
 </head>
 <body>
 
@@ -117,11 +119,11 @@
 
             <div class="cd" id="cd-route">
               <div class="cd-trigger" id="cd-route-trigger">
-                <span id="cd-route-label">Brute force</span>
+                <span id="cd-route-label">Held-Karp</span>
                 <span class="cd-arrow">▼</span>
               </div>
               <div class="cd-list" id="cd-route-list">
-                <div class="cd-option selected" data-value="heldkarp">Held-Karp (optimal + fast up to 25)</div>
+                <div class="cd-option selected" data-value="heldkarp">Held-Karp (optimal + fast up to 20 stops)</div>
                 <div class="cd-option" data-value="brute">Brute force</div>
                 <div class="cd-option" data-value="nearest">Nearest neighbour</div>
               </div>
@@ -203,7 +205,6 @@
   </div>
 </div>
 
-<script src="/static/api.js"></script>
-<script src="/static/dashboard.js"></script>
+
 </body>
 </html>

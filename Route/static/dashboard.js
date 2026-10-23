@@ -33,7 +33,7 @@ const state = {
   lastRouteReport: null, // text report from the last generated route
 };
 
-const dropdownState = { route: 'brute', address: 'home' };
+const dropdownState = { route: 'heldkarp', address: 'home' };
 
 function resetState() {
   state.assigned = [];
@@ -807,6 +807,13 @@ function makeDropdown(triggerId, listId, labelId, stateKey) {
   if (!trigger || !list || !label) return;
   const options = list.querySelectorAll('.cd-option');
 
+  const initial = Array.from(options).find(o => o.dataset.value === dropdownState[stateKey]);
+  if (initial) {
+    options.forEach(o => o.classList.remove('selected'));
+    initial.classList.add('selected');
+    label.textContent = initial.textContent;
+  }
+  
   trigger.addEventListener('click', e => {
     e.stopPropagation();
     const wasOpen = list.classList.contains('open');
